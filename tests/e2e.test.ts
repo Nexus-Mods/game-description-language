@@ -24,6 +24,14 @@ describe('end-to-end', () => {
     expect(bundle).toMatch(/registerInstaller/);
     expect(bundle).toMatch(/["']pak["']/);            // installer id
     expect(bundle).toMatch(/\*\*\/\*\.pak/);   // the glob made it through
+
+    // tests.gen.ts emitted alongside the other artifacts
+    const testsGenPath = join(work, '.gdl-out', 'tests.gen.ts');
+    expect(existsSync(testsGenPath)).toBe(true);
+    const testsGen = readFileSync(testsGenPath, 'utf8');
+    expect(testsGen).toContain("describe('helloworld — generated tests'");
+    expect(testsGen).toContain("it('typical pak mod'");
+    expect(testsGen).toContain('/games/Hello/Mods/Paks/CoolPak.pak');
   }, 60000);
 });
 

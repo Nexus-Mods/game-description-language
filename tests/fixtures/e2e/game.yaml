@@ -8,9 +8,7 @@ stores:
   steam: 264710
 context:
   modsRoot: ${installPath}/Mods
-  paksRoot: !storeBranch
-    xbox:    ${installPath}/Content/Paks/~mods
-    default: ${modsRoot}/Paks
+  paksRoot: ${modsRoot}/Paks
 modTypes:
   - { id: pak, name: Pak Mod, path: "${paksRoot}" }
 installers:
@@ -21,3 +19,13 @@ installers:
     take: parent
     placeAt: "${paksRoot}"
     modType: pak
+tests:
+  corpus: off
+  cases:
+    - name: typical pak mod
+      archive: [MyMod/CoolPak.pak, MyMod/Readme.md]
+      expect:
+        matched: pak
+        plan:
+          - /games/Hello/Mods/Paks/CoolPak.pak
+          - /games/Hello/Mods/Paks/Readme.md
