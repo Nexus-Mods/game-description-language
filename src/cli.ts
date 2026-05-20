@@ -30,11 +30,17 @@ program
   .command('test:corpus')
   .description('Run installer rules against archives in tests/cache/')
   .option('-y, --yaml <path>', 'path to game.yaml')
-  .action(async (opts: { yaml?: string }) => {
+  .option('--fetch', 'fetch fresh Nexus manifests into tests/cache/ before running')
+  .option('--mods <ids>', 'comma-separated mod IDs to fetch (e.g. --mods 100,101,102)', (v) =>
+    v.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n))
+  )
+  .action(async (opts: { yaml?: string; fetch?: boolean; mods?: number[] }) => {
     try {
       await runTestCorpus({
         cwd: process.cwd(),
-        ...(opts.yaml !== undefined && { yamlPath: opts.yaml }),
+        ...(opts.yaml  !== undefined && { yamlPath: opts.yaml }),
+        ...(opts.fetch !== undefined && { fetch:    opts.fetch }),
+        ...(opts.mods  !== undefined && { modIds:   opts.mods }),
       });
     } catch (err) {
       const { reportBuildError } = await import('./commands/build.js');

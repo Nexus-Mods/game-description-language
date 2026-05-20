@@ -5,6 +5,7 @@ import { validate } from '../schema/validator.js';
 import { BuildErrors } from '../errors.js';
 import { localCachePaths } from '../corpus/archive.js';
 import { runCorpus } from '../corpus/runner.js';
+import { fetchCorpus } from '../nexus/fetch-corpus.js';
 import type { InstallerRule } from '../runtime/installer-engine.js';
 import type { DocumentNode, InstallerNode, ValueNode, PredicateNode } from '../parser/ast.js';
 import type { PredicateExpr } from '../runtime/predicate.js';
@@ -85,6 +86,8 @@ const flatVarsFromDoc = (doc: DocumentNode): Record<string, string> => {
 export interface TestCorpusArgs {
   cwd: string;
   yamlPath?: string;
+  fetch?: boolean;
+  modIds?: number[];      // optional list of mod IDs to fetch manifests for
 }
 
 export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
@@ -93,6 +96,28 @@ export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
   const doc = parseYaml(source, yamlPath);
   const errs = validate(doc);
   if (errs.length) throw new BuildErrors(errs);
+
+  if (args.fetch) {
+    if (doc.tests?.corpus !== 'nexus') {
+      process.stderr.write('--fetch requires `tests.corpus: nexus` in game.yaml\n');
+      process.exit(1);
+    }
+    const modIds = args.modIds ?? [];
+    if (modIds.length === 0) {
+      process.stderr.write('--fetch requires --mods <id,id,…> until live enumeration lands\n');
+      process.exit(1);
+    }
+    await fetchCorpus({
+      gameDomain: doc.game.id,           // assume game.id == Nexus domain_name
+      cacheDir: join(args.cwd, 'tests', 'cache'),
+      modIds,
+      onProgress: (e) => {
+        const sym = e.kind === 'fetched' ? '↓' : e.kind === 'skipped' ? '·' : '✖';
+        const tail = 'reason' in e ? `  ${e.reason}` : '';
+        process.stdout.write(`  ${sym} ${e.archive}${tail}\n`);
+      },
+    });
+  }
 
   const rules = (doc.installers ?? []).map(lowerRule);
   const archives = localCachePaths(args.cwd);
