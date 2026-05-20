@@ -124,10 +124,24 @@ export class GdlRuntime {
   }
 
   private async discover(stores: StoreDecl[]): Promise<DiscoveryFacts | null> {
-    // Plan 1 stub: trust Vortex's own game-store helpers indirectly through
-    // queryPath's caller. For MVP we just return null when no install is found.
-    // A later plan will plug stores in to GameStoreHelper.
-    void stores;
+    const { GameStoreHelper } = await import('vortex-api');
+    for (const s of stores) {
+      const appId = String(s.value);
+      try {
+        const found = await GameStoreHelper.findByAppId(appId, s.id);
+        if (found) {
+          return {
+            store: found.gameStoreId,
+            os: process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux',
+            arch: process.arch === 'arm64' ? 'arm64' : 'x64',
+            installPath: found.gamePath,
+            executablePath: found.gamePath,   // refined by Vortex later via game.executable()
+          };
+        }
+      } catch {
+        // Helper threw — try the next store.
+      }
+    }
     return null;
   }
 }

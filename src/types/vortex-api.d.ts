@@ -67,5 +67,14 @@ declare module 'vortex-api' {
     ) => void;
   }
 
+  export interface IFoundGame {
+    gamePath: string;
+    gameStoreId: string;
+  }
+
+  export const GameStoreHelper: {
+    findByAppId(appId: string | string[], storeId?: string): Promise<IFoundGame | null>;
+  };
+
   export const log: (level: string, message: string, meta?: unknown) => void;
 }
