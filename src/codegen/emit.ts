@@ -116,6 +116,16 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     .map(inst => `      ${renderInstaller(inst)}`)
     .join(',\n');
 
+  const hookIds = new Set<string>();
+  if (doc.discovery?.version) hookIds.add(doc.discovery.version.hookId);
+  const hookImports = hookIds.size
+    ? `import * as hooks from '../src/hooks.js';`
+    : '';
+
+  const versionHook = doc.discovery?.version
+    ? `hooks.${doc.discovery.version.hookId}`
+    : 'undefined';
+
   const stores = (doc.stores?.entries ?? [])
     .map(s => `      { id: ${sq(s.id)}, value: ${sq(s.value)} }`)
     .join(',\n');
@@ -125,7 +135,7 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
   const extension = `${banner(doc.game.span.file)}
 import { GdlRuntime } from '@gdl/runtime';
 import type { IExtensionContext } from 'vortex-api';
-
+${hookImports}
 export default function main(api: IExtensionContext): boolean {
   const runtime = new GdlRuntime(api);
   runtime.registerGame(
@@ -151,6 +161,9 @@ ${modTypes}
     [
 ${installers}
     ],
+    {
+      versionHook: ${versionHook},
+    },
   );
   return true;
 }

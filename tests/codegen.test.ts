@@ -75,6 +75,27 @@ installers:
   });
 });
 
+describe('emit hooks', () => {
+  const HOOKED = `
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+discovery:
+  version: !hook detectGameVersion
+`;
+
+  it('emits hook import and passes version hook to registerGame', () => {
+    const doc = parseYaml(HOOKED, 'hooked.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path.endsWith('extension.ts'))!;
+    expect(ext.contents).toContain(`import * as hooks from '../src/hooks.js'`);
+    expect(ext.contents).toContain(`versionHook: hooks.detectGameVersion`);
+  });
+});
+
 describe('writeEmittedFiles', () => {
   it('writes files to .gdl-out under the target dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-emit-'));

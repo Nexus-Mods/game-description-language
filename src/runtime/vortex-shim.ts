@@ -38,6 +38,7 @@ export class GdlRuntime {
     contextSpec: ContextSpec,
     modTypes: ModTypeDecl[],
     installers: InstallerRule[] = [],
+    discovery: { versionHook?: (ctx: DiscoveryFacts) => Promise<string | null> } = {},
   ) {
     const game: IGame = {
       id: decl.id,
@@ -49,6 +50,15 @@ export class GdlRuntime {
       queryPath: async () => {
         const facts = await this.discover(stores);
         if (!facts) return '';
+        if (discovery.versionHook) {
+          try {
+            const v = await discovery.versionHook(facts);
+            if (v) (facts as { version?: string }).version = v;
+          } catch {
+            // Version detection failure is non-fatal — resolver omits `version`
+            // from the resolved context, and !versionBranch falls through to default.
+          }
+        }
         this.resolvedCtx = resolveContext(contextSpec, facts);
         return { path: facts.installPath, store: facts.store };
       },
