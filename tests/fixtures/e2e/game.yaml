@@ -1,0 +1,15 @@
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+stores:
+  steam: 264710
+context:
+  modsRoot: ${installPath}/Mods
+  paksRoot: !storeBranch
+    xbox:    ${installPath}/Content/Paks/~mods
+    default: ${modsRoot}/Paks
+modTypes:
+  - { id: pak, name: Pak Mod, path: "${paksRoot}" }

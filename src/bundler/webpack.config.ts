@@ -16,6 +16,9 @@ export const buildConfig = (cwd: string): Configuration => ({
   },
   resolve: {
     extensions: ['.ts', '.js'],
+    extensionAlias: {
+      '.js': ['.ts', '.js'],
+    },
     alias: {
       '@gdl/runtime': resolve(here, '..', 'runtime'),
     },
