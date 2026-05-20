@@ -13,6 +13,7 @@ export interface DocumentNode extends Node {
   modTypes?: ModTypeNode[];
   installers?: InstallerNode[];
   discovery?: DiscoveryNode;
+  tests?: TestsNode;
 }
 
 export interface GameNode extends Node {
@@ -116,4 +117,27 @@ export interface HookRefNode extends Node {
 export interface DiscoveryNode extends Node {
   kind: 'discovery';
   version?: HookRefNode;       // !hook detectGameVersion
+}
+
+// Test harness types
+export type CorpusMode = 'off' | 'nexus';
+
+export interface TestsNode extends Node {
+  kind: 'tests';
+  corpus: CorpusMode;
+  cases: TestCaseNode[];
+}
+
+export interface TestCaseNode extends Node {
+  kind: 'testCase';
+  name: string;
+  archive: string[];              // list of archive paths (synthetic)
+  expect?: ExpectNode;
+}
+
+export interface ExpectNode extends Node {
+  kind: 'expect';
+  matched?: string;               // expected installer id
+  modType?: string;               // expected modType assigned
+  plan?: string[];                // expected destination paths, in any order
 }
