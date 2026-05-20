@@ -70,11 +70,17 @@ const parseValueNode = (node: YamlNode | null | undefined, file: string, source:
 
 export const parseYaml = (source: string, file: string): DocumentNode => {
   const doc: Document = parseDocument(source, { customTags, keepSourceTokens: true });
-  const errors: BuildError[] = doc.errors.map(e => ({
-    code: 'GDL001',
-    message: e.message,
-    span: spanOf(file, source, null),
-  }));
+  const errors: BuildError[] = doc.errors.map((e) => {
+    const linePos = e.linePos?.[0];
+    const span: YamlSpan = linePos
+      ? { file, line: linePos.line, column: linePos.col, offset: e.pos[0], length: e.pos[1] - e.pos[0] }
+      : { file, line: 1, column: 1, offset: 0, length: 0 };
+    return {
+      code: 'GDL001',
+      message: e.message,
+      span,
+    };
+  });
   if (errors.length) throw new BuildErrors(errors);
 
   const root = doc.contents;
