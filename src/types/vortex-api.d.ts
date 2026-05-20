@@ -23,6 +23,32 @@ declare module 'vortex-api' {
     test?: (instructions: unknown) => Promise<boolean>;
   }
 
+  export interface IInstruction {
+    type: 'copy';
+    source: string;
+    destination: string;
+  }
+
+  export interface ITestSupported {
+    supported: boolean;
+    requiredFiles?: string[];
+  }
+
+  export interface IInstallResult {
+    instructions: (IInstruction | { type: 'setmodtype'; value: string })[];
+  }
+
+  export type TestSupportedFn = (
+    files: string[],
+    gameId: string,
+  ) => Promise<ITestSupported>;
+
+  export type InstallFn = (
+    files: string[],
+    destinationPath: string,
+    gameId: string,
+  ) => Promise<IInstallResult>;
+
   export interface IExtensionContext {
     registerGame: (game: IGame) => void;
     registerModType: (
@@ -32,6 +58,12 @@ declare module 'vortex-api' {
       getPath: (game: IGame) => string,
       test: (instructions: unknown) => Promise<boolean>,
       options?: { name?: string },
+    ) => void;
+    registerInstaller: (
+      id: string,
+      priority: number,
+      testSupported: TestSupportedFn,
+      install: InstallFn,
     ) => void;
   }
 

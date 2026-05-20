@@ -1,8 +1,11 @@
-import type { IExtensionContext, IGame } from 'vortex-api';
+import type { IExtensionContext, IGame, TestSupportedFn, InstallFn } from 'vortex-api';
 import type { DiscoveryFacts, ResolvedContext, ResolvableValue } from './context-resolver.js';
 import { resolveContext, type ContextSpec } from './context-resolver.js';
 import { interpolate } from './interpolate.js';
 import { resolveBranch } from './branch-tags.js';
+import type { InstallerRule } from './installer-engine.js';
+import { buildInstallPlan } from './installer-engine.js';
+import { evalPredicateExpr } from './predicate.js';
 
 export interface GameDecl {
   id: string;
@@ -29,7 +32,13 @@ export class GdlRuntime {
 
   constructor(private readonly api: IExtensionContext) {}
 
-  registerGame(decl: GameDecl, stores: StoreDecl[], contextSpec: ContextSpec, modTypes: ModTypeDecl[]) {
+  registerGame(
+    decl: GameDecl,
+    stores: StoreDecl[],
+    contextSpec: ContextSpec,
+    modTypes: ModTypeDecl[],
+    installers: InstallerRule[] = [],
+  ) {
     const game: IGame = {
       id: decl.id,
       name: decl.name,
@@ -57,6 +66,37 @@ export class GdlRuntime {
         { name: mt.name },
       );
     }
+
+    for (const inst of installers) {
+      this.registerInstallerRule(decl.id, inst);
+    }
+  }
+
+  private registerInstallerRule(gameId: string, rule: InstallerRule): void {
+    const testSupported: TestSupportedFn = async (files, gid) => {
+      if (gid !== gameId) return { supported: false };
+      const ctx = {
+        archivePaths: files,
+        vars: this.resolvedCtx ?? {},
+      };
+      return { supported: evalPredicateExpr(rule.when, ctx) };
+    };
+
+    const install: InstallFn = async (files, _destinationPath, gid) => {
+      const ctx = {
+        archivePaths: files,
+        vars: this.resolvedCtx ?? {},
+      };
+      if (gid !== gameId) return { instructions: [] };
+      const plan = buildInstallPlan(rule, files, ctx);
+      const instructions = plan.flatMap(p => [
+        { type: 'copy' as const, source: p.source, destination: p.destination },
+        { type: 'setmodtype' as const, value: p.modType },
+      ]);
+      return { instructions };
+    };
+
+    this.api.registerInstaller(rule.id, rule.priority, testSupported, install);
   }
 
   private resolveModTypePath(mt: ModTypeDecl): string {
