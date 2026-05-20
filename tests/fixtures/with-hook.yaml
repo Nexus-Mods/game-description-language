@@ -1,0 +1,8 @@
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+discovery:
+  version: !hook detectGameVersion

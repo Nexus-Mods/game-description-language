@@ -75,4 +75,10 @@ describe('parseYaml', () => {
     expect(i.single!.placeAt).toMatchObject({ kind: 'interpolated', template: '${modsRoot}' });
     expect(i.modType).toBe('pak');
   });
+
+  it('parses discovery.version hook reference', () => {
+    const doc = parseYaml(fixture('with-hook.yaml'), 'with-hook.yaml');
+    expect(doc.discovery).toBeDefined();
+    expect(doc.discovery!.version).toMatchObject({ kind: 'hookRef', hookId: 'detectGameVersion' });
+  });
 });

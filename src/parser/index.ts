@@ -36,8 +36,24 @@ const tagToKind = (tag: BranchTagName): 'storeBranch' | 'osBranch' | 'versionBra
   : tag === '!osBranch' ? 'osBranch'
   : 'versionBranch';
 
+const parseHookRef = (node: YamlNode | null | undefined, file: string, source: string): HookRefNode => {
+  if (isScalar(node) && (node as { tag?: unknown }).tag === HOOK_TAG && typeof node.value === 'string') {
+    return { kind: 'hookRef', hookId: node.value, span: spanOf(file, source, node) };
+  }
+  throw new BuildErrors([{
+    code: 'GDL060',
+    message: 'expected `!hook <id>` reference',
+    span: spanOf(file, source, node ?? null),
+  }]);
+};
+
 const parseValueNode = (node: YamlNode | null | undefined, file: string, source: string): ValueNode => {
   const span = spanOf(file, source, node ?? null);
+
+  // Hook reference: scalar with !hook tag.
+  if (isScalar(node) && (node as { tag?: unknown }).tag === HOOK_TAG && typeof node.value === 'string') {
+    return { kind: 'hookRef', hookId: node.value, span };
+  }
 
   // Branch tag: tagged YAMLMap with one of the known branch tag names.
   if (isMap(node) && typeof node.tag === 'string' && BRANCH_TAG_NAMES.has(node.tag as BranchTagName)) {
@@ -389,6 +405,18 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }
   }
 
+  const discoveryYaml = root.get('discovery', true);
+  let discovery: DiscoveryNode | undefined;
+  if (isMap(discoveryYaml)) {
+    const versionYaml = discoveryYaml.get('version', true);
+    if (versionYaml) {
+      const version = parseHookRef(versionYaml as YamlNode, file, source);
+      discovery = { kind: 'discovery', version, span: spanOf(file, source, discoveryYaml) };
+    } else {
+      discovery = { kind: 'discovery', span: spanOf(file, source, discoveryYaml) };
+    }
+  }
+
   return {
     kind: 'document',
     gdl,
@@ -397,6 +425,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(context    !== undefined && { context }),
     ...(modTypes   !== undefined && { modTypes }),
     ...(installers !== undefined && { installers }),
+    ...(discovery  !== undefined && { discovery }),
     span: spanOf(file, source, root),
   };
 };
