@@ -20,5 +20,8 @@ describe('end-to-end', () => {
     const bundle = readFileSync(join(work, 'dist', 'extension.js'), 'utf8');
     expect(bundle).toMatch(/helloworld/);
     expect(bundle).toMatch(/Pak Mod/);
+    expect(bundle).toMatch(/registerInstaller/);
+    expect(bundle).toMatch(/["']pak["']/);            // installer id
+    expect(bundle).toMatch(/\*\*\/\*\.pak/);   // the glob made it through
   }, 60000);
 });

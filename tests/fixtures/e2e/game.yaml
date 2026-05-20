@@ -13,3 +13,11 @@ context:
     default: ${modsRoot}/Paks
 modTypes:
   - { id: pak, name: Pak Mod, path: "${paksRoot}" }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: "${paksRoot}"
+    modType: pak
