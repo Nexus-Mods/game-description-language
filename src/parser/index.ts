@@ -1,5 +1,5 @@
 import { parseDocument, type Document, type Node as YamlNode, isMap, isSeq, isScalar, isPair } from 'yaml';
-import type { DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode } from './ast.js';
+import type { DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
 import { customTags, BRANCH_TAG_NAMES, type BranchTagName } from './tags.js';
@@ -171,12 +171,35 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     context = { kind: 'context', bindings, span: spanOf(file, source, contextYaml) };
   }
 
+  const modTypesYaml = root.get('modTypes', true);
+  let modTypes: ModTypeNode[] | undefined;
+  if (isSeq(modTypesYaml)) {
+    modTypes = [];
+    for (const entry of modTypesYaml.items) {
+      if (!isMap(entry)) {
+        throw new BuildErrors([{
+          code: 'GDL030',
+          message: 'modTypes entries must be mappings',
+          span: spanOf(file, source, entry as YamlNode),
+        }]);
+      }
+      modTypes.push({
+        kind: 'modType',
+        id: String(entry.get('id') ?? ''),
+        name: String(entry.get('name') ?? ''),
+        path: parseValueNode(entry.get('path', true) as YamlNode, file, source),
+        span: spanOf(file, source, entry),
+      });
+    }
+  }
+
   return {
     kind: 'document',
     gdl,
     game,
-    ...(stores  !== undefined && { stores }),
-    ...(context !== undefined && { context }),
+    ...(stores   !== undefined && { stores }),
+    ...(context  !== undefined && { context }),
+    ...(modTypes !== undefined && { modTypes }),
     span: spanOf(file, source, root),
   };
 };

@@ -1,0 +1,15 @@
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+context:
+  modsRoot: ${installPath}/Mods
+modTypes:
+  - id: pak
+    name: Pak Mod
+    path: ${modsRoot}
+  - id: lua
+    name: Lua Mod
+    path: ${installPath}/Scripts

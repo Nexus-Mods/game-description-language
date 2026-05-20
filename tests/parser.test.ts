@@ -51,4 +51,12 @@ describe('parseYaml', () => {
     expect(branch.arms.xbox).toMatchObject({ kind: 'interpolated' });
     expect(branch.default).toMatchObject({ kind: 'interpolated' });
   });
+
+  it('parses modTypes block', () => {
+    const doc = parseYaml(fixture('with-modtypes.yaml'), 'with-modtypes.yaml');
+    expect(doc.modTypes).toHaveLength(2);
+    expect(doc.modTypes![0].id).toBe('pak');
+    expect(doc.modTypes![0].name).toBe('Pak Mod');
+    expect(doc.modTypes![0].path).toMatchObject({ kind: 'interpolated', template: '${modsRoot}' });
+  });
 });
