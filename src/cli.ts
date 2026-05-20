@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { buildExtension, reportBuildError } from './commands/build.js';
+import { runTestCorpus } from './commands/test-corpus.js';
 
 const program = new Command();
 program
@@ -20,6 +21,23 @@ program
       });
       process.stdout.write('build ok\n');
     } catch (err) {
+      process.stderr.write(reportBuildError(err) + '\n');
+      process.exit(1);
+    }
+  });
+
+program
+  .command('test:corpus')
+  .description('Run installer rules against archives in tests/cache/')
+  .option('-y, --yaml <path>', 'path to game.yaml')
+  .action(async (opts: { yaml?: string }) => {
+    try {
+      await runTestCorpus({
+        cwd: process.cwd(),
+        ...(opts.yaml !== undefined && { yamlPath: opts.yaml }),
+      });
+    } catch (err) {
+      const { reportBuildError } = await import('./commands/build.js');
       process.stderr.write(reportBuildError(err) + '\n');
       process.exit(1);
     }
