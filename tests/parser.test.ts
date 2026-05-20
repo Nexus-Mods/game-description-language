@@ -59,4 +59,20 @@ describe('parseYaml', () => {
     expect(doc.modTypes![0].name).toBe('Pak Mod');
     expect(doc.modTypes![0].path).toMatchObject({ kind: 'interpolated', template: '${modsRoot}' });
   });
+
+  it('parses installers with !hasFile predicate', () => {
+    const doc = parseYaml(fixture('with-installer.yaml'), 'with-installer.yaml');
+    expect(doc.installers).toHaveLength(1);
+    const i = doc.installers![0]!;
+    expect(i.id).toBe('pak');
+    expect(i.priority).toBe(10);
+    expect(i.when).toMatchObject({ kind: 'hasFile' });
+    if (i.when.kind !== 'hasFile') return;
+    expect(i.when.pattern).toMatchObject({ kind: 'glob', pattern: '**/*.pak' });
+    expect(i.single).toBeDefined();
+    expect(i.single!.anchor).toMatchObject({ kind: 'glob', pattern: '**/*.pak' });
+    expect(i.single!.take).toBe('parent');
+    expect(i.single!.placeAt).toMatchObject({ kind: 'interpolated', template: '${modsRoot}' });
+    expect(i.modType).toBe('pak');
+  });
 });

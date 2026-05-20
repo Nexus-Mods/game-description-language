@@ -1,8 +1,18 @@
 import { parseDocument, type Document, type Node as YamlNode, isMap, isSeq, isScalar, isPair } from 'yaml';
-import type { DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode } from './ast.js';
+import type {
+  DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode,
+  InstallerNode, SingleInstallerForm, RouteEntry, TakeStrategy,
+  PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
+} from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
-import { customTags, BRANCH_TAG_NAMES, type BranchTagName } from './tags.js';
+import {
+  BRANCH_TAG_NAMES, type BranchTagName,
+  PATTERN_TAG_NAMES, type PatternTagName,
+  PREDICATE_TAG_NAMES, type PredicateTagName,
+  HOOK_TAG,
+  customTags,
+} from './tags.js';
 
 const spanOf = (file: string, source: string, node: YamlNode | null | undefined): YamlSpan => {
   const range = (node as { range?: [number, number, number] } | null)?.range;
@@ -64,6 +74,126 @@ const parseValueNode = (node: YamlNode | null | undefined, file: string, source:
   throw new BuildErrors([{
     code: 'GDL020',
     message: 'unsupported value (expected scalar literal, interpolated string, or branch tag)',
+    span,
+  }]);
+};
+
+const parsePattern = (node: YamlNode | null | undefined, file: string, source: string): PatternNode => {
+  const span = spanOf(file, source, node ?? null);
+  if (isScalar(node) && typeof node.value === 'string') {
+    const tag = typeof node.tag === 'string' ? node.tag : '!hasFile';
+    if (tag === '!matches') return { kind: 'regex', pattern: node.value, span };
+    return { kind: 'glob', pattern: node.value, span };
+  }
+  throw new BuildErrors([{
+    code: 'GDL040',
+    message: 'expected a pattern string',
+    span,
+  }]);
+};
+
+const parseTakeStrategy = (node: YamlNode | null | undefined, file: string, source: string): TakeStrategy => {
+  if (isScalar(node)) {
+    const v = node.value;
+    if (v === 'self' || v === 'parent' || v === 'parent.parent') return v;
+    if (typeof v === 'number' && Number.isInteger(v) && v >= 0) return { depth: v };
+  }
+  throw new BuildErrors([{
+    code: 'GDL041',
+    message: '`take:` must be one of `self`, `parent`, `parent.parent`, or a non-negative integer depth',
+    span: spanOf(file, source, node ?? null),
+  }]);
+};
+
+const parseValueRef = (node: YamlNode, file: string, source: string): ValueRef => {
+  if (!isScalar(node)) {
+    throw new BuildErrors([{
+      code: 'GDL046',
+      message: 'expected a scalar reference or literal',
+      span: spanOf(file, source, node),
+    }]);
+  }
+  const v = node.value;
+  if (typeof v === 'string') {
+    const m = /^\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}$/.exec(v);
+    if (m) return { kind: 'ref', name: m[1]! };
+    return { kind: 'literal', raw: v };
+  }
+  if (typeof v === 'number' || typeof v === 'boolean') return { kind: 'literal', raw: v };
+  throw new BuildErrors([{
+    code: 'GDL046',
+    message: 'expected a scalar reference or literal',
+    span: spanOf(file, source, node),
+  }]);
+};
+
+const parseComparison = (node: YamlNode, file: string, source: string): ComparisonExpr => {
+  if (!isMap(node)) {
+    throw new BuildErrors([{
+      code: 'GDL043',
+      message: '`!when` requires a mapping with `op`, `left`, `right`',
+      span: spanOf(file, source, node),
+    }]);
+  }
+  const op = String(node.get('op') ?? '');
+  if (!['==', '!=', '>=', '<=', '>', '<', 'in'].includes(op)) {
+    throw new BuildErrors([{
+      code: 'GDL044',
+      message: `unknown comparison operator \`${op}\``,
+      span: spanOf(file, source, node),
+      hint: 'one of: ==, !=, >=, <=, >, <, in',
+    }]);
+  }
+  const leftRaw = node.get('left', true) as YamlNode;
+  const rightRaw = node.get('right', true) as YamlNode;
+  const left = parseValueRef(leftRaw, file, source);
+  if (op === 'in') {
+    if (!isSeq(rightRaw)) {
+      throw new BuildErrors([{
+        code: 'GDL045',
+        message: '`in` operator requires `right` to be a sequence',
+        span: spanOf(file, source, rightRaw),
+      }]);
+    }
+    const right = rightRaw.items.map(i => parseValueRef(i as YamlNode, file, source));
+    return { op: 'in', left, right };
+  }
+  const right = parseValueRef(rightRaw, file, source);
+  return { op: op as ComparisonExpr['op'], left, right } as ComparisonExpr;
+};
+
+const parsePredicate = (node: YamlNode | null | undefined, file: string, source: string): PredicateNode => {
+  const span = spanOf(file, source, node ?? null);
+  const tag = (node as { tag?: unknown } | null)?.tag;
+
+  if (typeof tag === 'string') {
+    if (tag === '!hasFile') {
+      return { kind: 'hasFile', pattern: parsePattern(node, file, source), span };
+    }
+    if (tag === '!hasFiles' && isSeq(node)) {
+      const patterns = node.items.map(i => parsePattern(i as YamlNode, file, source));
+      return { kind: 'hasFiles', patterns, span };
+    }
+    if (tag === '!matches') {
+      return { kind: 'matches', pattern: parsePattern(node, file, source), span };
+    }
+    if (tag === '!any' && isSeq(node)) {
+      return { kind: 'any', arms: node.items.map(i => parsePredicate(i as YamlNode, file, source)), span };
+    }
+    if (tag === '!all' && isSeq(node)) {
+      return { kind: 'all', arms: node.items.map(i => parsePredicate(i as YamlNode, file, source)), span };
+    }
+    if (tag === '!not' && isSeq(node) && node.items.length === 1) {
+      return { kind: 'not', arm: parsePredicate(node.items[0] as YamlNode, file, source), span };
+    }
+    if (tag === '!when' && isMap(node)) {
+      return { kind: 'when', expr: parseComparison(node, file, source), span };
+    }
+  }
+
+  throw new BuildErrors([{
+    code: 'GDL042',
+    message: 'expected a predicate (`!hasFile`/`!hasFiles`/`!matches`/`!when`/`!any`/`!all`/`!not`)',
     span,
   }]);
 };
@@ -199,13 +329,74 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }
   }
 
+  const installersYaml = root.get('installers', true);
+  let installers: InstallerNode[] | undefined;
+  if (isSeq(installersYaml)) {
+    installers = [];
+    for (const entry of installersYaml.items) {
+      if (!isMap(entry)) {
+        throw new BuildErrors([{
+          code: 'GDL050',
+          message: 'installer entries must be mappings',
+          span: spanOf(file, source, entry as YamlNode),
+        }]);
+      }
+      const id = String(entry.get('id') ?? '');
+      const priority = Number(entry.get('priority') ?? 50);
+      const when = parsePredicate(entry.get('when', true) as YamlNode, file, source);
+
+      const routeYaml = entry.get('route', true);
+      let single: SingleInstallerForm | undefined;
+      let route: RouteEntry[] | undefined;
+      let modType: string | undefined;
+      if (isSeq(routeYaml)) {
+        route = routeYaml.items.map(rEntry => {
+          if (!isMap(rEntry)) {
+            throw new BuildErrors([{
+              code: 'GDL051',
+              message: 'route entries must be mappings',
+              span: spanOf(file, source, rEntry as YamlNode),
+            }]);
+          }
+          return {
+            match:   parsePattern(rEntry.get('match', true)  as YamlNode, file, source),
+            anchor:  parsePattern(rEntry.get('anchor', true) as YamlNode, file, source),
+            take:    parseTakeStrategy(rEntry.get('take', true) as YamlNode, file, source),
+            placeAt: parseValueNode(rEntry.get('placeAt', true) as YamlNode, file, source),
+            modType: String(rEntry.get('modType') ?? ''),
+            span:    spanOf(file, source, rEntry),
+          };
+        });
+      } else {
+        single = {
+          anchor:  parsePattern(entry.get('anchor', true) as YamlNode, file, source),
+          take:    parseTakeStrategy(entry.get('take', true) as YamlNode, file, source),
+          placeAt: parseValueNode(entry.get('placeAt', true) as YamlNode, file, source),
+        };
+        modType = String(entry.get('modType') ?? '');
+      }
+
+      installers.push({
+        kind: 'installer',
+        id,
+        priority,
+        when,
+        ...(single   !== undefined && { single }),
+        ...(route    !== undefined && { route }),
+        ...(modType  !== undefined && { modType }),
+        span: spanOf(file, source, entry),
+      });
+    }
+  }
+
   return {
     kind: 'document',
     gdl,
     game,
-    ...(stores   !== undefined && { stores }),
-    ...(context  !== undefined && { context }),
-    ...(modTypes !== undefined && { modTypes }),
+    ...(stores     !== undefined && { stores }),
+    ...(context    !== undefined && { context }),
+    ...(modTypes   !== undefined && { modTypes }),
+    ...(installers !== undefined && { installers }),
     span: spanOf(file, source, root),
   };
 };
