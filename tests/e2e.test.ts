@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, cpSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, cpSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildExtension } from '../src/commands/build.js';
@@ -53,4 +53,35 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(bundle).toMatch(/['"]composite-mod['"]/);
     expect(bundle).toMatch(/detectGameVersion/);
   }, 90000);
+});
+
+describe('end-to-end (corpus runner)', () => {
+  it('runs all archives in tests/cache through the engine', async () => {
+    const work = mkdtempSync(join(tmpdir(), 'gdl-corpus-'));
+    cpSync(join(import.meta.dirname, 'fixtures', 'e2e'), work, { recursive: true });
+    const cacheDir = join(work, 'tests', 'cache');
+    mkdirSync(cacheDir, { recursive: true });
+    cpSync(
+      join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.zip'),
+      join(cacheDir, 'typical-pak.zip'),
+    );
+
+    const { runTestCorpus } = await import('../src/commands/test-corpus.js');
+    await runTestCorpus({ cwd: work });
+    // If we got here without process.exit, the corpus run passed without failures.
+  }, 30000);
+
+  it('also runs JSON-manifest archives', async () => {
+    const work = mkdtempSync(join(tmpdir(), 'gdl-corpus-json-'));
+    cpSync(join(import.meta.dirname, 'fixtures', 'e2e'), work, { recursive: true });
+    const cacheDir = join(work, 'tests', 'cache');
+    mkdirSync(cacheDir, { recursive: true });
+    cpSync(
+      join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.json'),
+      join(cacheDir, 'typical-pak.json'),
+    );
+
+    const { runTestCorpus } = await import('../src/commands/test-corpus.js');
+    await runTestCorpus({ cwd: work });
+  }, 30000);
 });
