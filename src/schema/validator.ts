@@ -137,5 +137,43 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.tests) {
+    const declaredInstallers = new Set((doc.installers ?? []).map(i => i.id));
+    const declaredModTypes   = new Set((doc.modTypes   ?? []).map(mt => mt.id));
+    for (const c of doc.tests.cases) {
+      if (!c.name.trim()) {
+        errors.push({
+          code: 'GDL120',
+          message: 'test case name is required',
+          span: c.span,
+        });
+      }
+      if (c.archive.length === 0) {
+        errors.push({
+          code: 'GDL121',
+          message: 'test case archive list cannot be empty',
+          span: c.span,
+        });
+      }
+      if (c.expect?.matched !== undefined && !declaredInstallers.has(c.expect.matched)) {
+        errors.push({
+          code: 'GDL122',
+          message: `test case \`${c.name}\` expects matched installer \`${c.expect.matched}\` which is not declared`,
+          span: c.span,
+          hint: declaredInstallers.size
+            ? `declared installers: ${[...declaredInstallers].join(', ')}`
+            : 'no installers declared',
+        });
+      }
+      if (c.expect?.modType !== undefined && !declaredModTypes.has(c.expect.modType)) {
+        errors.push({
+          code: 'GDL123',
+          message: `test case \`${c.name}\` expects modType \`${c.expect.modType}\` which is not declared`,
+          span: c.span,
+        });
+      }
+    }
+  }
+
   return errors;
 };

@@ -137,4 +137,89 @@ installers:
     const errors = validate(doc);
     expect(errors.some(e => e.code === 'GDL112')).toBe(true);
   });
+
+  it('rejects test case with empty name', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+tests:
+  corpus: off
+  cases:
+    - name: ""
+      archive: ["x.pak"]
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL120')).toBe(true);
+  });
+
+  it('rejects test case with empty archive', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+tests:
+  corpus: off
+  cases:
+    - name: case1
+      archive: []
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL121')).toBe(true);
+  });
+
+  it('rejects expect.matched referencing undeclared installer', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+tests:
+  corpus: off
+  cases:
+    - name: case1
+      archive: [a.pak]
+      expect: { matched: ue4ss-lua }
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL122')).toBe(true);
+  });
 });
