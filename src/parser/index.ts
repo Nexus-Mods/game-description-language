@@ -1,5 +1,5 @@
 import { parseDocument, type Document, type Node as YamlNode, isMap, isSeq, isScalar, isPair } from 'yaml';
-import type { DocumentNode, GameNode, StoresNode, StoreId } from './ast.js';
+import type { DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
 import { customTags } from './tags.js';
@@ -18,6 +18,26 @@ const spanOf = (file: string, source: string, node: YamlNode | null | undefined)
 const STORE_IDS = new Set<StoreId>([
   'steam', 'epic', 'gog', 'xbox', 'ea', 'microsoftStore', 'manual',
 ]);
+
+const isInterpolated = (s: string): boolean => s.includes('${');
+
+const parseValueNode = (node: YamlNode | null | undefined, file: string, source: string): ValueNode => {
+  if (isScalar(node)) {
+    const raw = node.value;
+    if (typeof raw === 'string' && isInterpolated(raw)) {
+      return { kind: 'interpolated', template: raw, span: spanOf(file, source, node) };
+    }
+    if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
+      return { kind: 'literal', raw, span: spanOf(file, source, node) };
+    }
+  }
+  // Branch tags handled in Task 6.
+  throw new BuildErrors([{
+    code: 'GDL020',
+    message: 'unsupported value (expected scalar literal or interpolated string)',
+    span: spanOf(file, source, node ?? null),
+  }]);
+};
 
 export const parseYaml = (source: string, file: string): DocumentNode => {
   const doc: Document = parseDocument(source, { customTags, keepSourceTokens: true });
@@ -109,11 +129,25 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     stores = { kind: 'stores', entries, span: spanOf(file, source, storesYaml) };
   }
 
+  const contextYaml = root.get('context', true);
+  let context: ContextNode | undefined;
+  if (isMap(contextYaml)) {
+    const bindings: ContextNode['bindings'] = [];
+    for (const pair of contextYaml.items) {
+      if (!isPair(pair)) continue;
+      const name = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+      const value = parseValueNode(pair.value as YamlNode, file, source);
+      bindings.push({ name, value, span: spanOf(file, source, pair.key as YamlNode) });
+    }
+    context = { kind: 'context', bindings, span: spanOf(file, source, contextYaml) };
+  }
+
   return {
     kind: 'document',
     gdl,
     game,
-    ...(stores !== undefined && { stores }),
+    ...(stores  !== undefined && { stores }),
+    ...(context !== undefined && { context }),
     span: spanOf(file, source, root),
   };
 };

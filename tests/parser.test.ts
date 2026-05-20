@@ -33,4 +33,12 @@ describe('parseYaml', () => {
       xbox: 'Unknown.Subnautica2',
     });
   });
+
+  it('parses context bindings with interpolation', () => {
+    const doc = parseYaml(fixture('with-context.yaml'), 'with-context.yaml');
+    expect(doc.context).toBeDefined();
+    const byName = Object.fromEntries(doc.context!.bindings.map(b => [b.name, b.value]));
+    expect(byName.modsRoot).toMatchObject({ kind: 'interpolated', template: '${installPath}/Mods' });
+    expect(byName.literal).toMatchObject({ kind: 'literal', raw: 'hello' });
+  });
 });

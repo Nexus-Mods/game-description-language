@@ -1,0 +1,9 @@
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+context:
+  modsRoot: ${installPath}/Mods
+  literal: hello
