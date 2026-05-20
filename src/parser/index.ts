@@ -1,5 +1,5 @@
 import { parseDocument, type Document, type Node as YamlNode, isMap, isSeq, isScalar, isPair } from 'yaml';
-import type { DocumentNode, GameNode } from './ast.js';
+import type { DocumentNode, GameNode, StoresNode, StoreId } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
 import { customTags } from './tags.js';
@@ -14,6 +14,10 @@ const spanOf = (file: string, source: string, node: YamlNode | null | undefined)
   const column = start - (lastNl + 1) + 1;
   return { file, line, column, offset: start, length: end - start };
 };
+
+const STORE_IDS = new Set<StoreId>([
+  'steam', 'epic', 'gog', 'xbox', 'ea', 'microsoftStore', 'manual',
+]);
 
 export const parseYaml = (source: string, file: string): DocumentNode => {
   const doc: Document = parseDocument(source, { customTags, keepSourceTokens: true });
@@ -72,10 +76,44 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     span: spanOf(file, source, gameSpanNode),
   };
 
+  const storesYaml = root.get('stores', true);
+  let stores: StoresNode | undefined;
+  if (isMap(storesYaml)) {
+    const entries: StoresNode['entries'] = [];
+    for (const pair of storesYaml.items) {
+      if (!isPair(pair)) continue;
+      const key = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+      if (!STORE_IDS.has(key as StoreId)) {
+        throw new BuildErrors([{
+          code: 'GDL010',
+          message: `unknown store \`${key}\``,
+          span: spanOf(file, source, pair.key as YamlNode),
+          hint: `expected one of: ${[...STORE_IDS].join(', ')}`,
+        }]);
+      }
+      const valueNode = pair.value;
+      const value = isScalar(valueNode) ? valueNode.value : null;
+      if (typeof value !== 'string' && typeof value !== 'number') {
+        throw new BuildErrors([{
+          code: 'GDL011',
+          message: `store \`${key}\` value must be string or number`,
+          span: spanOf(file, source, valueNode as YamlNode),
+        }]);
+      }
+      entries.push({
+        id: key as StoreId,
+        value,
+        span: spanOf(file, source, pair.key as YamlNode),
+      });
+    }
+    stores = { kind: 'stores', entries, span: spanOf(file, source, storesYaml) };
+  }
+
   return {
     kind: 'document',
     gdl,
     game,
+    ...(stores !== undefined && { stores }),
     span: spanOf(file, source, root),
   };
 };

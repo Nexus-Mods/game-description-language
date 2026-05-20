@@ -22,4 +22,15 @@ describe('parseYaml', () => {
     expect(doc.game.span.line).toBe(2);
     expect(doc.game.span.column).toBe(1);
   });
+
+  it('parses stores block', () => {
+    const doc = parseYaml(fixture('with-stores.yaml'), 'with-stores.yaml');
+    expect(doc.stores).toBeDefined();
+    const byId = Object.fromEntries(doc.stores!.entries.map(e => [e.id, e.value]));
+    expect(byId).toEqual({
+      steam: 264710,
+      epic: 'Subnautica2',
+      xbox: 'Unknown.Subnautica2',
+    });
+  });
 });

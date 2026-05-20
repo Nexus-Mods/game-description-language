@@ -1,0 +1,10 @@
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+stores:
+  steam: 264710
+  epic:  Subnautica2
+  xbox:  Unknown.Subnautica2
