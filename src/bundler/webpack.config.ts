@@ -7,6 +7,7 @@ const bundleTsConfig = resolve(here, 'tsconfig.bundle.json');
 
 export const buildConfig = (cwd: string): Configuration => ({
   mode: 'production',
+  devtool: 'source-map',
   entry: join(cwd, '.gdl-out', 'extension.ts'),
   target: 'node',
   output: {

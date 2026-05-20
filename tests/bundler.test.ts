@@ -16,6 +16,7 @@ describe('runBundler', () => {
     );
     await runBundler(dir);
     expect(existsSync(join(dir, 'dist', 'extension.js'))).toBe(true);
+    expect(existsSync(join(dir, 'dist', 'extension.js.map'))).toBe(true);
     const bundle = readFileSync(join(dir, 'dist', 'extension.js'), 'utf8');
     expect(bundle).toContain('vortex-api');   // externalised reference present
   }, 30000);
