@@ -48,7 +48,7 @@ Stores are flat by default — each store has one canonical identifier type and 
 
 ```yaml
 stores:
-  steam: "264710"
+  steam: 264710
   epic:  Subnautica2
   xbox:  Unknown.Subnautica2
 ```
@@ -95,21 +95,21 @@ game:
   requiredFiles: [SubnauticaZero.exe]
 
 stores:
-  steam: "264710"
+  steam: 264710
   epic:  Subnautica2
   xbox:  Unknown.Subnautica2
 
 context:
   paksRoot: !storeBranch
-    xbox:    "${installPath}/Content/Paks/~mods"
-    default: "${installPath}/SubnauticaZero/Content/Paks/~mods"
-  logicModsRoot: "${installPath}/SubnauticaZero/Content/Paks/LogicMods"
-  ue4ssModsRoot: "${installPath}/SubnauticaZero/Binaries/Win64/Mods"
+    xbox:    ${installPath}/Content/Paks/~mods
+    default: ${installPath}/SubnauticaZero/Content/Paks/~mods
+  logicModsRoot: ${installPath}/SubnauticaZero/Content/Paks/LogicMods
+  ue4ssModsRoot: ${installPath}/SubnauticaZero/Binaries/Win64/Mods
 
 modTypes:
-  - { id: pak,        name: Pak Mod,       path: "${paksRoot}" }
-  - { id: logic-mod,  name: LogicMod,      path: "${logicModsRoot}" }
-  - { id: ue4ss-lua,  name: UE4SS Lua Mod, path: "${ue4ssModsRoot}" }
+  - { id: pak,        name: Pak Mod,       path: ${paksRoot} }
+  - { id: logic-mod,  name: LogicMod,      path: ${logicModsRoot} }
+  - { id: ue4ss-lua,  name: UE4SS Lua Mod, path: ${ue4ssModsRoot} }
 
 installers:
   - id: ue4ss-lua
@@ -117,7 +117,7 @@ installers:
     when:    !hasFile "**/Scripts/*.lua"
     anchor:  "**/Scripts/"
     take:    parent
-    placeAt: "${ue4ssModsRoot}/${archiveName}"
+    placeAt: ${ue4ssModsRoot}/${archiveName}
     modType: ue4ss-lua
 
   - id: logic-mod
@@ -125,7 +125,7 @@ installers:
     when:    !hasFile "**/LogicMods/**/*.pak"
     anchor:  "**/LogicMods/"
     take:    self
-    placeAt: "${logicModsRoot}"
+    placeAt: ${logicModsRoot}
     modType: logic-mod
 
   - id: pak
@@ -133,7 +133,7 @@ installers:
     when:    !hasFile "**/*.pak"
     anchor:  "**/*.pak"
     take:    parent
-    placeAt: "${paksRoot}"
+    placeAt: ${paksRoot}
     modType: pak
 
   - id: composite-mod
@@ -143,12 +143,12 @@ installers:
       - match:    "**/Scripts/*.lua"
         anchor:   "**/Scripts/"
         take:     parent
-        placeAt:  "${ue4ssModsRoot}/${archiveName}"
+        placeAt:  ${ue4ssModsRoot}/${archiveName}
         modType:  ue4ss-lua
       - match:    "**/*.pak"
         anchor:   "**/*.pak"
         take:     parent
-        placeAt:  "${paksRoot}"
+        placeAt:  ${paksRoot}
         modType:  pak
 
 discovery:
@@ -165,8 +165,8 @@ tests:
       expect:
         matched: ue4ss-lua
         plan:
-          - "${ue4ssModsRoot}/MyMod/Scripts/main.lua"
-          - "${ue4ssModsRoot}/MyMod/Scripts/util.lua"
+          - ${ue4ssModsRoot}/MyMod/Scripts/main.lua
+          - ${ue4ssModsRoot}/MyMod/Scripts/util.lua
 
 nexus:
   modId: 1234   # set after the Nexus mod page exists; used by `gdl publish`
