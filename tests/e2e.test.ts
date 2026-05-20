@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, cpSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, cpSync, existsSync, readFileSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { buildExtension } from '../src/commands/build.js';
 
 
@@ -60,6 +61,45 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(testsGen).toContain("it('plain pak mod'");
     expect(testsGen).toContain("it('composite — pak + lua picks composite installer'");
   }, 90000);
+});
+
+describe('end-to-end (generated tests run)', () => {
+  it('vitest can execute the generated tests.gen.ts and the inline cases pass', async () => {
+    const work = mkdtempSync(join(tmpdir(), 'gdl-run-tests-'));
+    cpSync(join(import.meta.dirname, 'fixtures', 'e2e'), work, { recursive: true });
+
+    // Symlink <work>/gdl → the GDL repo root so the relative
+    // `../gdl/src/runtime/index.js` import in tests.gen.ts resolves.
+    const gdlRoot = resolve(import.meta.dirname, '..');
+    symlinkSync(gdlRoot, join(work, 'gdl'), 'dir');
+
+    // Build the extension; this emits .gdl-out/tests.gen.ts.
+    await buildExtension({ cwd: work });
+    expect(existsSync(join(work, '.gdl-out', 'tests.gen.ts'))).toBe(true);
+
+    // Vitest needs a config in the work dir; create a minimal one.
+    const vitestConfig = `import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: { include: ['.gdl-out/tests.gen.ts'], globals: false },
+});
+`;
+    writeFileSync(join(work, 'vitest.config.ts'), vitestConfig);
+
+    // Run vitest using the GDL repo's vitest binary (reachable via the gdl symlink).
+    const vitestBin = join(work, 'gdl', 'node_modules', '.bin', 'vitest');
+    const result = spawnSync(vitestBin, ['run'], {
+      cwd: work,
+      encoding: 'utf8',
+      env: { ...process.env, FORCE_COLOR: '0' },
+    });
+
+    // Diagnostics on failure
+    if (result.status !== 0) {
+      console.error('vitest stdout:\n' + (result.stdout ?? ''));
+      console.error('vitest stderr:\n' + (result.stderr ?? ''));
+    }
+    expect(result.status).toBe(0);
+  }, 60000);
 });
 
 describe('end-to-end (corpus runner)', () => {

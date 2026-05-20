@@ -37,6 +37,7 @@ describe('renderTestsFile', () => {
     expect(testsFile).toBeDefined();
     expect(testsFile!.contents).toContain("import { describe, it } from 'vitest'");
     expect(testsFile!.contents).toContain("import { buildInstallPlan");
+    expect(testsFile!.contents).toContain("from '../gdl/src/runtime/index.js'");
     expect(testsFile!.contents).toContain("import { rules } from './installers.gen.js'");
     expect(testsFile!.contents).toContain("it('typical'");
     expect(testsFile!.contents).toContain("matched: 'pak'");
