@@ -62,16 +62,21 @@ installers:
     modType: pak
 `;
 
-  it('emits installer registration in extension.ts', () => {
+  it('emits installer registration in installers.gen.ts', () => {
     const doc = parseYaml(TINY_INSTALLER, 'tiny.yaml');
     const files = emit(doc);
-    const ext = files.find(f => f.path.endsWith('extension.ts'))!;
-    expect(ext.contents).toContain("id: 'pak'");
-    expect(ext.contents).toContain("priority: 10");
-    expect(ext.contents).toContain("kind: 'hasFile'");
-    expect(ext.contents).toContain("pattern: '**/*.pak'");
-    expect(ext.contents).toContain("take: 'parent'");
-    expect(ext.contents).toContain("modType: 'pak'");
+    const installersGen = files.find(f => f.path === 'installers.gen.ts')!;
+    expect(installersGen).toBeDefined();
+    expect(installersGen.contents).toContain("id: 'pak'");
+    expect(installersGen.contents).toContain("priority: 10");
+    expect(installersGen.contents).toContain("kind: 'hasFile'");
+    expect(installersGen.contents).toContain("pattern: '**/*.pak'");
+    expect(installersGen.contents).toContain("take: 'parent'");
+    expect(installersGen.contents).toContain("modType: 'pak'");
+    // extension.ts should import rules from the generated file
+    const ext = files.find(f => f.path === 'extension.ts')!;
+    expect(ext.contents).toContain("import { rules } from './installers.gen.js'");
+    expect(ext.contents).toContain("rules,");
   });
 });
 

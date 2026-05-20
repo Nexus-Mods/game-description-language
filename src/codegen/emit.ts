@@ -6,6 +6,7 @@ import type {
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { buildSourceMap, type LineMapping } from './source-map.js';
+import { renderTestsFile } from './tests-emit.js';
 
 export interface EmittedFile {
   path: string;        // relative to .gdl-out/
@@ -17,7 +18,7 @@ export interface EmitOptions {
 }
 
 /** Render a string value as a single-quoted TS string literal. */
-const sq = (s: string | number | boolean): string => {
+export const sq = (s: string | number | boolean): string => {
   if (typeof s !== 'string') return JSON.stringify(s);
   return `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 };
@@ -133,9 +134,20 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
 
   const reqFiles = `[${doc.game.requiredFiles.map(sq).join(', ')}]`;
 
+  const installersFile = `${banner(doc.game.span.file)}
+import type { InstallerRule } from '@gdl/runtime';
+
+export const rules: InstallerRule[] = [
+${installers}
+];
+`;
+
+  const testsFile = renderTestsFile(doc);
+
   const extension = `${banner(doc.game.span.file)}
 import { GdlRuntime } from '@gdl/runtime';
 import type { IExtensionContext } from 'vortex-api';
+import { rules } from './installers.gen.js';
 ${hookImports}
 export default function main(api: IExtensionContext): boolean {
   const runtime = new GdlRuntime(api);
@@ -159,9 +171,7 @@ ${bindings}
     [
 ${modTypes}
     ],
-    [
-${installers}
-    ],
+    rules,
     {
       versionHook: ${versionHook},
     },
@@ -188,11 +198,16 @@ ${installers}
   const map = buildSourceMap('extension.ts', doc.game.span.file, lineMappings);
   const extensionWithMapRef = extension + `\n//# sourceMappingURL=extension.ts.map\n`;
 
-  return [
-    { path: 'extension.ts',     contents: extensionWithMapRef },
-    { path: 'extension.ts.map', contents: JSON.stringify(map) },
-    { path: 'info.json',        contents: info },
+  const files: EmittedFile[] = [
+    { path: 'extension.ts',      contents: extensionWithMapRef },
+    { path: 'extension.ts.map',  contents: JSON.stringify(map) },
+    { path: 'installers.gen.ts', contents: installersFile },
+    { path: 'info.json',         contents: info },
   ];
+  if (testsFile) {
+    files.push({ path: 'tests.gen.ts', contents: testsFile });
+  }
+  return files;
 };
 
 export const writeEmittedFiles = async (cwd: string, files: EmittedFile[]): Promise<void> => {
