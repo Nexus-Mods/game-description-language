@@ -1,0 +1,39 @@
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve, join } from 'node:path';
+import type { Configuration } from 'webpack';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const bundleTsConfig = resolve(here, 'tsconfig.bundle.json');
+
+export const buildConfig = (cwd: string): Configuration => ({
+  mode: 'production',
+  entry: join(cwd, '.gdl-out', 'extension.ts'),
+  target: 'node',
+  output: {
+    path: join(cwd, 'dist'),
+    filename: 'extension.js',
+    libraryTarget: 'commonjs2',
+  },
+  resolve: {
+    extensions: ['.ts', '.js'],
+    alias: {
+      '@gdl/runtime': resolve(here, '..', 'runtime'),
+    },
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        loader: 'ts-loader',
+        options: {
+          transpileOnly: true,
+          configFile: bundleTsConfig,
+          compilerOptions: { module: 'commonjs', target: 'es2022' },
+        },
+      },
+    ],
+  },
+  externals: {
+    'vortex-api': 'commonjs2 vortex-api',
+  },
+});
