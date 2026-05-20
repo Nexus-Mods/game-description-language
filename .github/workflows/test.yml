@@ -1,0 +1,63 @@
+name: gdl-test
+
+on:
+  workflow_call:
+    secrets:
+      NEXUS_API_KEY:
+        required: false
+    inputs:
+      mod-ids:
+        description: Comma-separated Nexus mod IDs to fetch when NEXUS_API_KEY is set
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      HAS_NEXUS_KEY: ${{ secrets.NEXUS_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (submodule)
+        working-directory: gdl
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (submodule)
+        working-directory: gdl
+        run: pnpm build
+
+      - name: Restore corpus cache
+        uses: actions/cache@v4
+        with:
+          path: tests/cache
+          key: corpus-${{ github.repository }}-v1
+
+      - name: gdl build (extension)
+        run: node gdl/dist/cli.js build
+
+      - name: pnpm test (extension)
+        run: pnpm test
+        if: hashFiles('package.json') != ''
+
+      - name: Fetch + run corpus (Nexus key present)
+        if: env.HAS_NEXUS_KEY == 'true' && inputs.mod-ids != ''
+        env:
+          NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}
+        run: node gdl/dist/cli.js test:corpus --fetch --mods "${{ inputs.mod-ids }}"
+
+      - name: Run corpus (no fetch, no Nexus key OR no mod-ids)
+        if: env.HAS_NEXUS_KEY != 'true' || inputs.mod-ids == ''
+        run: node gdl/dist/cli.js test:corpus
