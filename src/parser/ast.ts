@@ -11,6 +11,8 @@ export interface DocumentNode extends Node {
   stores?: StoresNode;
   context?: ContextNode;
   modTypes?: ModTypeNode[];
+  installers?: InstallerNode[];
+  discovery?: DiscoveryNode;
 }
 
 export interface GameNode extends Node {
@@ -40,11 +42,78 @@ export type ValueNode =
   | { kind: 'interpolated'; template: string; span: YamlSpan }
   | { kind: 'storeBranch'; arms: Record<string, ValueNode>; default: ValueNode; span: YamlSpan }
   | { kind: 'osBranch'; arms: Record<string, ValueNode>; default: ValueNode; span: YamlSpan }
-  | { kind: 'versionBranch'; arms: Record<string, ValueNode>; default: ValueNode; span: YamlSpan };
+  | { kind: 'versionBranch'; arms: Record<string, ValueNode>; default: ValueNode; span: YamlSpan }
+  | { kind: 'hookRef'; hookId: string; span: YamlSpan };
 
 export interface ModTypeNode extends Node {
   kind: 'modType';
   id: string;
   name: string;
   path: ValueNode;
+}
+
+export type TakeStrategy = 'self' | 'parent' | 'parent.parent' | { depth: number };
+
+export interface InstallerNode extends Node {
+  kind: 'installer';
+  id: string;
+  priority: number;
+  when: PredicateNode;
+  // Single-anchor form OR route form. Exactly one is set.
+  single?: SingleInstallerForm;
+  route?: RouteEntry[];
+  // modType only required for single form; route entries carry their own modType.
+  modType?: string;
+}
+
+export interface SingleInstallerForm {
+  anchor: PatternNode;
+  take: TakeStrategy;
+  placeAt: ValueNode;          // template
+}
+
+export interface RouteEntry {
+  match: PatternNode;
+  anchor: PatternNode;
+  take: TakeStrategy;
+  placeAt: ValueNode;
+  modType: string;
+  span: YamlSpan;
+}
+
+// Patterns
+export type PatternNode =
+  | { kind: 'glob';  pattern: string;   span: YamlSpan }
+  | { kind: 'regex'; pattern: string;   span: YamlSpan };
+
+// Predicates
+export type PredicateNode =
+  | { kind: 'hasFile';  pattern: PatternNode;        span: YamlSpan }
+  | { kind: 'hasFiles'; patterns: PatternNode[];     span: YamlSpan }
+  | { kind: 'matches';  pattern: PatternNode;        span: YamlSpan }
+  | { kind: 'when';     expr: ComparisonExpr;        span: YamlSpan }
+  | { kind: 'any';      arms: PredicateNode[];       span: YamlSpan }
+  | { kind: 'all';      arms: PredicateNode[];       span: YamlSpan }
+  | { kind: 'not';      arm: PredicateNode;          span: YamlSpan };
+
+// Boolean comparison expression used by `!when`. Intentionally tiny.
+export type ComparisonExpr =
+  | { op: '==' | '!=';                left: ValueRef; right: ValueRef }
+  | { op: 'in';                       left: ValueRef; right: ValueRef[] }
+  | { op: '>=' | '<=' | '>' | '<';    left: ValueRef; right: ValueRef };
+
+export type ValueRef =
+  | { kind: 'literal';  raw: string | number | boolean }
+  | { kind: 'ref';      name: string };       // context variable or built-in (store, os, version)
+
+// Hook references
+export interface HookRefNode extends Node {
+  kind: 'hookRef';
+  hookId: string;             // e.g. 'detectGameVersion'
+}
+
+// Top-level discovery block
+export interface DiscoveryNode extends Node {
+  kind: 'discovery';
+  version?: HookRefNode;       // !hook detectGameVersion
 }

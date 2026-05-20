@@ -24,6 +24,11 @@ const renderValueNode = (v: ValueNode): string => {
   if (v.kind === 'interpolated') {
     return `{ kind: 'interpolated', template: ${sq(v.template)} }`;
   }
+  if (v.kind === 'hookRef') {
+    // hookRefs only appear in discovery.version today (Task 14 wires that path).
+    // If a context: binding or modType.path ever uses !hook, we want this to throw loudly.
+    throw new Error(`hookRef value (${v.hookId}) is not allowed in this position — only discovery.version accepts !hook in Plan 2`);
+  }
   // Branch tag.
   const arms = Object.entries(v.arms)
     .map(([k, arm]) => `${sq(k)}: ${renderValueNode(arm)}`)
