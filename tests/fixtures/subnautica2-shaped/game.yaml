@@ -66,3 +66,36 @@ installers:
 
 discovery:
   version: !hook detectGameVersion
+
+tests:
+  corpus: off
+  cases:
+    - name: ue4ss lua mod
+      archive:
+        - MyMod/Scripts/main.lua
+        - MyMod/Scripts/util.lua
+      expect:
+        matched: ue4ss-lua
+        modType: ue4ss-lua
+
+    - name: logic-mod under LogicMods/
+      archive:
+        - Pack/LogicMods/BPFolder/X.pak
+        - Pack/LogicMods/Y.pak
+      expect:
+        matched: logic-mod
+        modType: logic-mod
+
+    - name: plain pak mod
+      archive:
+        - Pack/Cool.pak
+      expect:
+        matched: pak
+        modType: pak
+
+    - name: composite — pak + lua picks composite installer
+      archive:
+        - A/Scripts/main.lua
+        - A/Cool.pak
+      expect:
+        matched: composite-mod

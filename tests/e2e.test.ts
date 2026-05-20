@@ -52,6 +52,13 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(bundle).toMatch(/['"]logic-mod['"]/);
     expect(bundle).toMatch(/['"]composite-mod['"]/);
     expect(bundle).toMatch(/detectGameVersion/);
+
+    const testsGen = readFileSync(join(work, '.gdl-out', 'tests.gen.ts'), 'utf8');
+    expect(testsGen).toContain("describe('subnautica2-shaped — generated tests'");
+    expect(testsGen).toContain("it('ue4ss lua mod'");
+    expect(testsGen).toContain("it('logic-mod under LogicMods/'");
+    expect(testsGen).toContain("it('plain pak mod'");
+    expect(testsGen).toContain("it('composite — pak + lua picks composite installer'");
   }, 90000);
 });
 
