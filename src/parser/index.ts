@@ -2,7 +2,7 @@ import { parseDocument, type Document, type Node as YamlNode, isMap, isSeq, isSc
 import type { DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
-import { customTags } from './tags.js';
+import { customTags, BRANCH_TAG_NAMES, type BranchTagName } from './tags.js';
 
 const spanOf = (file: string, source: string, node: YamlNode | null | undefined): YamlSpan => {
   const range = (node as { range?: [number, number, number] } | null)?.range;
@@ -21,7 +21,36 @@ const STORE_IDS = new Set<StoreId>([
 
 const isInterpolated = (s: string): boolean => s.includes('${');
 
+const tagToKind = (tag: BranchTagName): 'storeBranch' | 'osBranch' | 'versionBranch' =>
+  tag === '!storeBranch' ? 'storeBranch'
+  : tag === '!osBranch' ? 'osBranch'
+  : 'versionBranch';
+
 const parseValueNode = (node: YamlNode | null | undefined, file: string, source: string): ValueNode => {
+  const span = spanOf(file, source, node ?? null);
+
+  // Branch tag: tagged YAMLMap with one of the known branch tag names.
+  if (isMap(node) && typeof node.tag === 'string' && BRANCH_TAG_NAMES.has(node.tag as BranchTagName)) {
+    const tag = node.tag as BranchTagName;
+    const arms: Record<string, ValueNode> = {};
+    let defaultArm: ValueNode | undefined;
+    for (const pair of node.items) {
+      if (!isPair(pair)) continue;
+      const armKey = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+      const armValue = parseValueNode(pair.value as YamlNode, file, source);
+      if (armKey === 'default') defaultArm = armValue;
+      else arms[armKey] = armValue;
+    }
+    if (!defaultArm) {
+      throw new BuildErrors([{
+        code: 'GDL022',
+        message: `\`${tag}\` requires a \`default:\` arm`,
+        span,
+      }]);
+    }
+    return { kind: tagToKind(tag), arms, default: defaultArm, span };
+  }
+
   if (isScalar(node)) {
     const raw = node.value;
     if (typeof raw === 'string' && isInterpolated(raw)) {
@@ -31,11 +60,11 @@ const parseValueNode = (node: YamlNode | null | undefined, file: string, source:
       return { kind: 'literal', raw, span: spanOf(file, source, node) };
     }
   }
-  // Branch tags handled in Task 6.
+
   throw new BuildErrors([{
     code: 'GDL020',
-    message: 'unsupported value (expected scalar literal or interpolated string)',
-    span: spanOf(file, source, node ?? null),
+    message: 'unsupported value (expected scalar literal, interpolated string, or branch tag)',
+    span,
   }]);
 };
 

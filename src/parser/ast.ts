@@ -39,7 +39,8 @@ export type ValueNode =
   | { kind: 'literal'; raw: string | number | boolean; span: YamlSpan }
   | { kind: 'interpolated'; template: string; span: YamlSpan }
   | { kind: 'storeBranch'; arms: Record<string, ValueNode>; default: ValueNode; span: YamlSpan }
-  | { kind: 'osBranch'; arms: Record<string, ValueNode>; default: ValueNode; span: YamlSpan };
+  | { kind: 'osBranch'; arms: Record<string, ValueNode>; default: ValueNode; span: YamlSpan }
+  | { kind: 'versionBranch'; arms: Record<string, ValueNode>; default: ValueNode; span: YamlSpan };
 
 export interface ModTypeNode extends Node {
   kind: 'modType';

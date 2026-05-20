@@ -41,4 +41,14 @@ describe('parseYaml', () => {
     expect(byName.modsRoot).toMatchObject({ kind: 'interpolated', template: '${installPath}/Mods' });
     expect(byName.literal).toMatchObject({ kind: 'literal', raw: 'hello' });
   });
+
+  it('parses !storeBranch values', () => {
+    const doc = parseYaml(fixture('with-context.yaml'), 'with-context.yaml');
+    const byName = Object.fromEntries(doc.context!.bindings.map(b => [b.name, b.value]));
+    const branch = byName.paksRoot;
+    expect(branch.kind).toBe('storeBranch');
+    if (branch.kind !== 'storeBranch') return;
+    expect(branch.arms.xbox).toMatchObject({ kind: 'interpolated' });
+    expect(branch.default).toMatchObject({ kind: 'interpolated' });
+  });
 });

@@ -7,3 +7,6 @@ game:
 context:
   modsRoot: ${installPath}/Mods
   literal: hello
+  paksRoot: !storeBranch
+    xbox:    ${installPath}/Content/Paks/~mods
+    default: ${installPath}/Game/Content/Paks/~mods
