@@ -40,6 +40,41 @@ describe('emit', () => {
   });
 });
 
+describe('emit installers', () => {
+  const TINY_INSTALLER = `
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+context:
+  modsRoot: ${'${installPath}'}/Mods
+modTypes:
+  - { id: pak, name: Pak Mod, path: "${'${modsRoot}'}" }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: "${'${modsRoot}'}"
+    modType: pak
+`;
+
+  it('emits installer registration in extension.ts', () => {
+    const doc = parseYaml(TINY_INSTALLER, 'tiny.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path.endsWith('extension.ts'))!;
+    expect(ext.contents).toContain("id: 'pak'");
+    expect(ext.contents).toContain("priority: 10");
+    expect(ext.contents).toContain("kind: 'hasFile'");
+    expect(ext.contents).toContain("pattern: '**/*.pak'");
+    expect(ext.contents).toContain("take: 'parent'");
+    expect(ext.contents).toContain("modType: 'pak'");
+  });
+});
+
 describe('writeEmittedFiles', () => {
   it('writes files to .gdl-out under the target dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-emit-'));
