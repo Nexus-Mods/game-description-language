@@ -81,5 +81,61 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.installers) {
+    const declaredModTypes = new Set((doc.modTypes ?? []).map(mt => mt.id));
+    const seenIds = new Set<string>();
+    for (const inst of doc.installers) {
+      if (!ID_PATTERN.test(inst.id)) {
+        errors.push({
+          code: 'GDL113',
+          message: `installer.id \`${inst.id}\` must match ${ID_PATTERN}`,
+          span: inst.span,
+        });
+      }
+      if (seenIds.has(inst.id)) {
+        errors.push({
+          code: 'GDL111',
+          message: `duplicate installer id \`${inst.id}\``,
+          span: inst.span,
+        });
+      }
+      seenIds.add(inst.id);
+
+      const hasSingle = inst.single !== undefined;
+      const hasRoute  = inst.route  !== undefined;
+      if (hasSingle === hasRoute) {
+        errors.push({
+          code: 'GDL112',
+          message: 'installer must have exactly one of `single` (anchor/take/placeAt/modType) or `route`',
+          span: inst.span,
+        });
+      }
+      if (hasSingle) {
+        const mt = inst.modType ?? '';
+        if (!declaredModTypes.has(mt)) {
+          errors.push({
+            code: 'GDL110',
+            message: `installer \`${inst.id}\` references undeclared modType \`${mt}\``,
+            span: inst.span,
+            hint: declaredModTypes.size
+              ? `declared modTypes: ${[...declaredModTypes].join(', ')}`
+              : 'no modTypes declared',
+          });
+        }
+      }
+      if (hasRoute) {
+        for (const r of inst.route!) {
+          if (!declaredModTypes.has(r.modType)) {
+            errors.push({
+              code: 'GDL110',
+              message: `route entry in installer \`${inst.id}\` references undeclared modType \`${r.modType}\``,
+              span: r.span,
+            });
+          }
+        }
+      }
+    }
+  }
+
   return errors;
 };

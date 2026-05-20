@@ -59,4 +59,82 @@ modTypes:
     const errors = validate(doc);
     expect(errors.some(e => e.code === 'GDL102')).toBe(true);
   });
+
+  it('rejects installer with undeclared modType', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: ue4ss-lua
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL110')).toBe(true);
+  });
+
+  it('rejects duplicate installer ids', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+  - id: pak
+    priority: 20
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL111')).toBe(true);
+  });
+
+  it('rejects installer that has both single form and route form', () => {
+    // Built by mutating a parsed doc since the parser picks one based on `route:` presence.
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`);
+    (doc.installers![0]! as { route?: unknown }).route = [];
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL112')).toBe(true);
+  });
 });
