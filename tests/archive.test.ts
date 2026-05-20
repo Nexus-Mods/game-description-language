@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readZipEntries } from '../src/corpus/archive.js';
+import { readManifestEntries, readArchiveEntries } from '../src/corpus/archive.js';
 
 describe('readZipEntries', () => {
   it('returns sorted POSIX paths from a zip file', () => {
@@ -31,5 +32,33 @@ describe('localCachePaths', () => {
     const { localCachePaths } = await import('../src/corpus/archive.js');
     const dir = mkdtempSync(join(tmpdir(), 'gdl-cache-empty-'));
     expect(localCachePaths(dir)).toEqual([]);
+  });
+});
+
+describe('readManifestEntries', () => {
+  it('parses a PreviewDirectory JSON manifest into a sorted file list', async () => {
+    const manifestPath = join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.json');
+    expect(readManifestEntries(manifestPath)).toEqual([
+      'MyMod/CoolPak.pak',
+      'MyMod/Readme.md',
+    ]);
+  });
+});
+
+describe('readArchiveEntries (dispatch)', () => {
+  it('dispatches .zip to readZipEntries', async () => {
+    const zipPath = join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.zip');
+    expect(readArchiveEntries(zipPath)).toEqual([
+      'MyMod/CoolPak.pak',
+      'MyMod/Readme.md',
+    ]);
+  });
+
+  it('dispatches .json to readManifestEntries', async () => {
+    const jsonPath = join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.json');
+    expect(readArchiveEntries(jsonPath)).toEqual([
+      'MyMod/CoolPak.pak',
+      'MyMod/Readme.md',
+    ]);
   });
 });

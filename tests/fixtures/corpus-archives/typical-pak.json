@@ -1,0 +1,16 @@
+{
+  "name": "typical-pak.zip",
+  "path": "",
+  "type": "directory",
+  "children": [
+    {
+      "name": "MyMod",
+      "path": "MyMod",
+      "type": "directory",
+      "children": [
+        { "name": "CoolPak.pak", "path": "MyMod/CoolPak.pak", "type": "file", "size": "1024" },
+        { "name": "Readme.md",   "path": "MyMod/Readme.md",   "type": "file", "size": "200" }
+      ]
+    }
+  ]
+}

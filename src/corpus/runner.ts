@@ -1,4 +1,4 @@
-import { readZipEntries } from './archive.js';
+import { readArchiveEntries } from './archive.js';
 import { buildInstallPlan, type InstallerRule, type InstallInstruction } from '../runtime/installer-engine.js';
 
 export interface CorpusEntry {
@@ -33,7 +33,7 @@ export const runCorpus = (
 
   for (const archive of archivePaths) {
     try {
-      const files = readZipEntries(archive);
+      const files = readArchiveEntries(archive);
       const ctx = { archivePaths: files, vars: opts.vars };
       let matchedRule: InstallerRule | undefined;
       let plan: InstallInstruction[] = [];

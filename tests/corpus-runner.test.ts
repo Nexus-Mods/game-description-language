@@ -29,6 +29,13 @@ describe('runCorpus', () => {
     });
   });
 
+  it('runs the engine against JSON manifest archives', () => {
+    const archive = join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.json');
+    const report: CorpusReport = runCorpus([pakRule], [archive], { vars: {} });
+    expect(report.matched).toBe(1);
+    expect(report.entries[0]?.planSize).toBe(2);
+  });
+
   it('reports unmatched archives without failing the run', () => {
     const onlyLua: InstallerRule = {
       ...pakRule,

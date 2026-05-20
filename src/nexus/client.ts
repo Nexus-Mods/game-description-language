@@ -1,72 +1,96 @@
-const API_BASE = 'https://api.nexusmods.com';
+const NEXUS_GAMES_URL    = 'https://data.nexusmods.com/file/nexus-data/games.json';
+const NEXUS_GRAPHQL_URL  = 'https://api.nexusmods.com/v2/graphql';
+const NEXUS_FILE_META    = 'https://file-metadata.nexusmods.com/file/nexus-files-s3-meta';
 
-export interface NexusAuth {
-  apiKey: string;
+export interface NexusGameEntry {
+  id: number;
+  domain_name: string;
+  name: string;
 }
 
-export interface ListModIdsParams extends NexusAuth {
-  gameDomain: string;
-}
-
-export interface ListModFilesParams extends NexusAuth {
-  gameDomain: string;
-  modId: number;
-}
-
-export interface DownloadUrlParams extends NexusAuth {
-  gameDomain: string;
-  modId: number;
+export interface NexusModFile {
+  uid: string;
+  uri: string;          // file name as used in the S3 metadata URL
   fileId: number;
-}
-
-export interface NexusFile {
-  fileId: number;
-  fileName: string;
+  name: string;
   version: string;
-  sizeKb: number;
+  category: string;     // typically 'MAIN', 'OPTIONAL', 'OLD_VERSION', ...
+  date: number;         // epoch seconds
 }
 
-const headers = (apiKey: string) => ({
-  apikey: apiKey,
-  accept: 'application/json',
-});
+export interface PreviewDirectory {
+  name: string;
+  path: string;
+  type: 'directory';
+  children: (PreviewDirectory | PreviewFile)[];
+}
 
-const expectOk = async (res: Response, ctx: string): Promise<void> => {
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Nexus ${ctx}: ${res.status} ${res.statusText} ${body}`);
+export interface PreviewFile {
+  name: string;
+  path: string;
+  type: 'file';
+  size: string;
+}
+
+const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
+  const res = await fetch(url, init);
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(`${url} returned ${res.status}. Set NEXUS_API_KEY env var if this endpoint requires authentication.`);
   }
+  if (!res.ok) {
+    throw new Error(`${url} returned ${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as T;
 };
 
-export const listGameModIds = async (p: ListModIdsParams): Promise<number[]> => {
-  // updated.json with period=1m enumerates mods touched in the last month.
-  // A future plan can broaden coverage via the v2 GraphQL API.
-  const url = `${API_BASE}/v1/games/${p.gameDomain}/mods/updated.json?period=1m`;
-  const res = await fetch(url, { headers: headers(p.apiKey) });
-  await expectOk(res, 'listGameModIds');
-  const body = (await res.json()) as { mod_id: number }[];
-  const ids = new Set<number>();
-  for (const m of body) ids.add(m.mod_id);
-  return [...ids].sort((a, b) => a - b);
+export const fetchGames = async (): Promise<NexusGameEntry[]> =>
+  fetchJson<NexusGameEntry[]>(NEXUS_GAMES_URL);
+
+const MOD_FILES_QUERY = `query($modId: ID!, $gameId: ID!) {
+  modFiles(modId: $modId, gameId: $gameId) {
+    uid uri fileId name version category date
+  }
+}`;
+
+export const fetchModFiles = async (gameId: number, modId: number): Promise<NexusModFile[]> => {
+  const apiKey = process.env.NEXUS_API_KEY;
+  const result = await fetchJson<{
+    data?: { modFiles: NexusModFile[] };
+    errors?: { message: string }[];
+  }>(NEXUS_GRAPHQL_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { apikey: apiKey } : {}),
+    },
+    body: JSON.stringify({
+      query: MOD_FILES_QUERY,
+      variables: { modId: String(modId), gameId: String(gameId) },
+    }),
+  });
+  if (result.errors?.length) {
+    throw new Error(`GraphQL modFiles error: ${result.errors.map(e => e.message).join('; ')}`);
+  }
+  if (!result.data?.modFiles) {
+    throw new Error('GraphQL modFiles returned no data');
+  }
+  return result.data.modFiles;
 };
 
-export const listModFiles = async (p: ListModFilesParams): Promise<NexusFile[]> => {
-  const url = `${API_BASE}/v1/games/${p.gameDomain}/mods/${p.modId}/files.json`;
-  const res = await fetch(url, { headers: headers(p.apiKey) });
-  await expectOk(res, 'listModFiles');
-  const body = (await res.json()) as { files: { file_id: number; file_name: string; version: string; size_kb: number }[] };
-  return body.files.map(f => ({
-    fileId: f.file_id, fileName: f.file_name, version: f.version, sizeKb: f.size_kb,
-  }));
+export const fetchArchiveManifest = async (
+  gameId: number,
+  modId: number,
+  fileUri: string,
+): Promise<PreviewDirectory> => {
+  const url = `${NEXUS_FILE_META}/${gameId}/${modId}/${encodeURIComponent(fileUri)}.json`;
+  return fetchJson<PreviewDirectory>(url);
 };
 
-export const getDownloadUrl = async (p: DownloadUrlParams): Promise<string> => {
-  // Premium-class API keys get CDN URLs directly. Non-premium keys may 403; the test
-  // suite doesn't exercise that path.
-  const url = `${API_BASE}/v1/games/${p.gameDomain}/mods/${p.modId}/files/${p.fileId}/download_link.json`;
-  const res = await fetch(url, { headers: headers(p.apiKey) });
-  await expectOk(res, 'getDownloadUrl');
-  const body = (await res.json()) as { URI: string; name?: string }[];
-  if (body.length === 0) throw new Error(`no download URLs returned for file ${p.fileId}`);
-  return body[0]!.URI;
+export const flattenManifest = (dir: PreviewDirectory): string[] => {
+  const out: string[] = [];
+  for (const child of dir.children) {
+    if (child.type === 'file') out.push(child.path);
+    else out.push(...flattenManifest(child));
+  }
+  return out;
 };
