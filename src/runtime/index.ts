@@ -6,6 +6,7 @@ export * from './glob.js';
 export * from './pattern-matcher.js';
 export * from './predicate.js';
 export * from './installer-engine.js';
+export * from './test-harness.js';
 
 // Public type alias for hook authors.
 export type { DiscoveryFacts as GameContext } from './context-resolver.js';
