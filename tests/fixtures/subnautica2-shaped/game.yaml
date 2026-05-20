@@ -1,0 +1,68 @@
+gdl: 1
+game:
+  id: subnautica2-shaped
+  name: Subnautica 2 (Shape Test)
+  executable: SubnauticaZero.exe
+  requiredFiles: [SubnauticaZero.exe]
+
+stores:
+  steam: 264710
+  epic:  Subnautica2
+  xbox:  Unknown.Subnautica2
+
+context:
+  paksRoot: !storeBranch
+    xbox:    ${installPath}/Content/Paks/~mods
+    default: ${installPath}/SubnauticaZero/Content/Paks/~mods
+  logicModsRoot: ${installPath}/SubnauticaZero/Content/Paks/LogicMods
+  ue4ssModsRoot: ${installPath}/SubnauticaZero/Binaries/Win64/Mods
+
+modTypes:
+  - { id: pak,        name: Pak Mod,       path: "${paksRoot}" }
+  - { id: logic-mod,  name: LogicMod,      path: "${logicModsRoot}" }
+  - { id: ue4ss-lua,  name: UE4SS Lua Mod, path: "${ue4ssModsRoot}" }
+
+installers:
+  - id: ue4ss-lua
+    priority: 10
+    when:    !hasFile "**/Scripts/*.lua"
+    anchor:  "**/Scripts/"
+    take:    parent
+    placeAt: "${ue4ssModsRoot}"
+    modType: ue4ss-lua
+
+  - id: logic-mod
+    priority: 20
+    when:    !hasFile "**/LogicMods/**/*.pak"
+    anchor:  "**/LogicMods/"
+    take:    self
+    placeAt: "${logicModsRoot}"
+    modType: logic-mod
+
+  - id: pak
+    priority: 30
+    when:    !hasFile "**/*.pak"
+    anchor:  "**/*.pak"
+    take:    parent
+    placeAt: "${paksRoot}"
+    modType: pak
+
+  - id: composite-mod
+    priority: 99
+    when: !all
+      - !hasFile "**/*.pak"
+      - !hasFile "**/Scripts/*.lua"
+    route:
+      - match:   "**/Scripts/*.lua"
+        anchor:  "**/Scripts/"
+        take:    parent
+        placeAt: "${ue4ssModsRoot}"
+        modType: ue4ss-lua
+      - match:   "**/*.pak"
+        anchor:  "**/*.pak"
+        take:    parent
+        placeAt: "${paksRoot}"
+        modType: pak
+
+discovery:
+  version: !hook detectGameVersion
