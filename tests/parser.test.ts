@@ -81,4 +81,18 @@ describe('parseYaml', () => {
     expect(doc.discovery).toBeDefined();
     expect(doc.discovery!.version).toMatchObject({ kind: 'hookRef', hookId: 'detectGameVersion' });
   });
+
+  it('parses tests block with inline cases', () => {
+    const doc = parseYaml(fixture('with-tests/game.yaml'), 'with-tests/game.yaml');
+    expect(doc.tests).toBeDefined();
+    expect(doc.tests!.corpus).toBe('off');
+    expect(doc.tests!.cases).toHaveLength(1);
+    const c = doc.tests!.cases[0]!;
+    expect(c.name).toBe('typical pak mod');
+    expect(c.archive).toEqual(['MyMod/CoolPak.pak', 'MyMod/Readme.md']);
+    expect(c.expect).toBeDefined();
+    expect(c.expect!.matched).toBe('pak');
+    expect(c.expect!.modType).toBe('pak');
+    expect(c.expect!.plan).toEqual(['${modsRoot}/CoolPak.pak', '${modsRoot}/Readme.md']);
+  });
 });

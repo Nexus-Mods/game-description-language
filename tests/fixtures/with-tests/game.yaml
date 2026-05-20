@@ -1,0 +1,31 @@
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+context:
+  modsRoot: ${installPath}/Mods
+modTypes:
+  - { id: pak, name: Pak Mod, path: "${modsRoot}" }
+installers:
+  - id: pak
+    priority: 10
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: "${modsRoot}"
+    modType: pak
+tests:
+  corpus: off
+  cases:
+    - name: typical pak mod
+      archive:
+        - MyMod/CoolPak.pak
+        - MyMod/Readme.md
+      expect:
+        matched: pak
+        modType: pak
+        plan:
+          - ${modsRoot}/CoolPak.pak
+          - ${modsRoot}/Readme.md

@@ -3,6 +3,7 @@ import type {
   DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode,
   InstallerNode, SingleInstallerForm, RouteEntry, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
+  TestsNode, TestCaseNode, ExpectNode, CorpusMode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -214,6 +215,70 @@ const parsePredicate = (node: YamlNode | null | undefined, file: string, source:
   }]);
 };
 
+const parseTestsBlock = (node: YamlNode, file: string, source: string): TestsNode => {
+  if (!isMap(node)) {
+    throw new BuildErrors([{
+      code: 'GDL080',
+      message: '`tests:` must be a mapping',
+      span: spanOf(file, source, node),
+    }]);
+  }
+
+  const corpusRaw = node.get('corpus');
+  const corpus: CorpusMode = corpusRaw === 'nexus' ? 'nexus' : 'off';
+
+  const casesYaml = node.get('cases', true);
+  const cases: TestCaseNode[] = [];
+  if (isSeq(casesYaml)) {
+    for (const entry of casesYaml.items) {
+      if (!isMap(entry)) {
+        throw new BuildErrors([{
+          code: 'GDL081',
+          message: '`tests.cases[]` entries must be mappings',
+          span: spanOf(file, source, entry as YamlNode),
+        }]);
+      }
+      const archiveYaml = entry.get('archive', true);
+      const archive: string[] = isSeq(archiveYaml)
+        ? archiveYaml.items.map(i => (isScalar(i) ? String(i.value) : String(i)))
+        : [];
+
+      let expectNode: ExpectNode | undefined;
+      const expectYaml = entry.get('expect', true);
+      if (isMap(expectYaml)) {
+        const planYaml = expectYaml.get('plan', true);
+        const plan: string[] | undefined = isSeq(planYaml)
+          ? planYaml.items.map(i => (isScalar(i) ? String(i.value) : String(i)))
+          : undefined;
+        const matched = expectYaml.has('matched') ? String(expectYaml.get('matched')) : undefined;
+        const modType = expectYaml.has('modType') ? String(expectYaml.get('modType')) : undefined;
+        expectNode = {
+          kind: 'expect',
+          ...(matched !== undefined && { matched }),
+          ...(modType !== undefined && { modType }),
+          ...(plan    !== undefined && { plan }),
+          span: spanOf(file, source, expectYaml as YamlNode),
+        };
+      }
+
+      cases.push({
+        kind: 'testCase',
+        name: String(entry.get('name') ?? ''),
+        archive,
+        ...(expectNode !== undefined && { expect: expectNode }),
+        span: spanOf(file, source, entry),
+      });
+    }
+  }
+
+  return {
+    kind: 'tests',
+    corpus,
+    cases,
+    span: spanOf(file, source, node),
+  };
+};
+
 export const parseYaml = (source: string, file: string): DocumentNode => {
   const doc: Document = parseDocument(source, { customTags, keepSourceTokens: true });
   const errors: BuildError[] = doc.errors.map((e) => {
@@ -417,6 +482,12 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }
   }
 
+  const testsYaml = root.get('tests', true);
+  let tests: TestsNode | undefined;
+  if (testsYaml) {
+    tests = parseTestsBlock(testsYaml as YamlNode, file, source);
+  }
+
   return {
     kind: 'document',
     gdl,
@@ -426,6 +497,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(modTypes   !== undefined && { modTypes }),
     ...(installers !== undefined && { installers }),
     ...(discovery  !== undefined && { discovery }),
+    ...(tests      !== undefined && { tests }),
     span: spanOf(file, source, root),
   };
 };
