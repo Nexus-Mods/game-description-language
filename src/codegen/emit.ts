@@ -1,4 +1,6 @@
 import type { DocumentNode, ValueNode } from '../parser/ast.js';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
 
 export interface EmittedFile {
   path: string;        // relative to .gdl-out/
@@ -92,4 +94,14 @@ ${modTypes}
     { path: 'extension.ts', contents: extension },
     { path: 'info.json',    contents: info },
   ];
+};
+
+export const writeEmittedFiles = async (cwd: string, files: EmittedFile[]): Promise<void> => {
+  const outDir = join(cwd, '.gdl-out');
+  await mkdir(outDir, { recursive: true });
+  for (const f of files) {
+    const dest = join(outDir, f.path);
+    await mkdir(dirname(dest), { recursive: true });
+    await writeFile(dest, f.contents, 'utf8');
+  }
 };
