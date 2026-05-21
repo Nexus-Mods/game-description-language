@@ -424,4 +424,72 @@ context:
     const binding = doc.context!.bindings.find(b => b.name === 'modRoot')!;
     expect(binding.value.kind).toBe('osBranch');
   });
+
+  it('parses object-form { hook: name } in discovery.version', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+discovery:
+  version: { hook: detectGameVersion }
+`, 'inline.yaml');
+    expect(doc.discovery?.version?.kind).toBe('hookRef');
+  });
+
+  it('parses object-form { hook: name } in events.did-deploy', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+events:
+  did-deploy: { hook: regenerateModsTxt }
+`, 'inline.yaml');
+    expect(doc.events?.didDeploy?.kind).toBe('hookRef');
+  });
+
+  it('parses object-form { openFile: path } in toolbar action target', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+toolbarActions:
+  - id: open-settings
+    title: Open Settings
+    priority: 100
+    target: { openFile: "/path/to/settings.ini" }
+`, 'inline.yaml');
+    expect(doc.toolbarActions![0]!.target).toEqual({
+      kind: 'openFile',
+      template: '/path/to/settings.ini',
+    });
+  });
+
+  it('parses object-form { openUrl: url } in toolbar action target', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+toolbarActions:
+  - id: open-nexus
+    title: Open Nexus
+    priority: 100
+    target: { openUrl: "https://nexusmods.com" }
+`, 'inline.yaml');
+    expect(doc.toolbarActions![0]!.target).toEqual({
+      kind: 'openUrl',
+      template: 'https://nexusmods.com',
+    });
+  });
 });

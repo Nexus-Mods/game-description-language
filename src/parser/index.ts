@@ -47,6 +47,14 @@ const parseHookRef = (node: YamlNode | null | undefined, file: string, source: s
   if (isScalar(node) && (node as { tag?: unknown }).tag === HOOK_TAG && typeof node.value === 'string') {
     return { kind: 'hookRef', hookId: node.value, span: spanOf(file, source, node) };
   }
+  // Object form: { hook: <name> }
+  if (isMap(node) && node.items.length === 1) {
+    const pair = node.items[0]!;
+    if (isScalar(pair.key) && pair.key.value === 'hook'
+        && isScalar(pair.value) && typeof pair.value.value === 'string') {
+      return { kind: 'hookRef', hookId: pair.value.value, span: spanOf(file, source, node) };
+    }
+  }
   throw new BuildErrors([{
     code: 'GDL060',
     message: 'expected `!hook <id>` reference',
@@ -373,6 +381,17 @@ const parseToolbarActionTarget = (node: YamlNode, file: string, source: string):
     if (tag === '!openFile') return { kind: 'openFile', template: node.value };
     if (tag === '!openUrl')  return { kind: 'openUrl',  template: node.value };
   }
+  if (isMap(node) && (typeof node.tag !== 'string' || node.tag === '')) {
+    if (node.items.length === 1) {
+      const pair = node.items[0]!;
+      if (isScalar(pair.key) && typeof pair.key.value === 'string'
+          && isScalar(pair.value) && typeof pair.value.value === 'string') {
+        const key = pair.key.value;
+        if (key === 'openFile') return { kind: 'openFile', template: pair.value.value };
+        if (key === 'openUrl')  return { kind: 'openUrl',  template: pair.value.value };
+      }
+    }
+  }
   throw new BuildErrors([{
     code: 'GDL140',
     message: 'toolbar action `target:` must be `!openFile <path>` or `!openUrl <url>`',
@@ -680,19 +699,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     const didDeployYaml = eventsYaml.get('did-deploy', true);
     let didDeploy: HookRefNode | undefined;
     if (didDeployYaml !== undefined && didDeployYaml !== null) {
-      if (isScalar(didDeployYaml) && typeof didDeployYaml.tag === 'string' && didDeployYaml.tag === '!hook' && typeof didDeployYaml.value === 'string') {
-        didDeploy = {
-          kind: 'hookRef',
-          hookId: didDeployYaml.value,
-          span: spanOf(file, source, didDeployYaml),
-        };
-      } else {
-        throw new BuildErrors([{
-          code: 'GDL151',
-          message: 'events.did-deploy must be a `!hook <name>` reference',
-          span: spanOf(file, source, didDeployYaml as YamlNode),
-        }]);
-      }
+      didDeploy = parseHookRef(didDeployYaml as YamlNode, file, source);
     }
     events = {
       kind: 'events',
