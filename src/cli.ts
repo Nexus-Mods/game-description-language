@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { buildExtension, reportBuildError } from './commands/build.js';
+import { packageExtension } from './commands/package.js';
 import { runTestCorpus } from './commands/test-corpus.js';
 
 const program = new Command();
@@ -21,6 +22,24 @@ program
       });
       process.stdout.write('build ok\n');
     } catch (err) {
+      process.stderr.write(reportBuildError(err) + '\n');
+      process.exit(1);
+    }
+  });
+
+program
+  .command('package')
+  .description('Build the extension and zip dist/ into out/<game-id>-vortex-v<version>.zip')
+  .option('-y, --yaml <path>', 'path to game.yaml')
+  .action(async (opts: { yaml?: string }) => {
+    try {
+      const result = await packageExtension({
+        cwd: process.cwd(),
+        ...(opts.yaml !== undefined && { yamlPath: opts.yaml }),
+      });
+      process.stdout.write(`Packaged: ${result.archivePath}\n`);
+    } catch (err) {
+      const { reportBuildError } = await import('./commands/build.js');
       process.stderr.write(reportBuildError(err) + '\n');
       process.exit(1);
     }
