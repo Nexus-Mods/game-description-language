@@ -84,6 +84,10 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(bundle).toMatch(/['"]root['"]/);
     expect(bundle).toMatch(/['"]ue4ss-lua-enabled['"]/);
     expect(bundle).toMatch(/archive-root/);
+
+    expect(bundle).toMatch(/ensureDirWritableAsync/);
+    expect(bundle).toMatch(/events\.on\(['"]did-deploy['"]/);
+    expect(bundle).toMatch(/regenerateModsTxt/);
   }, 90000);
 });
 

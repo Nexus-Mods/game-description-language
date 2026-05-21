@@ -251,7 +251,7 @@ events:
 `, 'tiny.yaml');
     const files = emit(doc);
     const ext = files.find(f => f.path === 'extension.ts')!;
-    expect(ext.contents).toMatch(/import\s+\{[^}]*regenerateMetadata[^}]*\}\s+from\s+['"]\.\.\/hooks/);
+    expect(ext.contents).toMatch(/import\s+\{[^}]*regenerateMetadata[^}]*\}\s+from\s+['"]\.\.\/src\/hooks/);
     expect(ext.contents).toMatch(/didDeploy:\s*regenerateMetadata/);
   });
 

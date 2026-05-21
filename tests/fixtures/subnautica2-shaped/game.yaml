@@ -107,6 +107,15 @@ installers:
 discovery:
   version: !hook detectGameVersion
 
+setup:
+  ensureDirs:
+    - ${paksRoot}
+    - ${logicModsRoot}
+    - ${ue4ssModsRoot}
+
+events:
+  did-deploy: !hook regenerateModsTxt
+
 tests:
   corpus: off
   cases:

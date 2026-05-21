@@ -147,7 +147,7 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
   const eventHookImports: string[] = [];
   if (didDeployRef) eventHookImports.push(didDeployRef);
   const eventHooksImportLine = eventHookImports.length > 0
-    ? `import { ${eventHookImports.join(', ')} } from '../hooks.js';`
+    ? `import { ${eventHookImports.join(', ')} } from '../src/hooks.js';`
     : '';
 
   const versionHook = doc.discovery?.version
