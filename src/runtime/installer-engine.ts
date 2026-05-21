@@ -27,6 +27,7 @@ export interface InstallerRule {
   id: string;
   priority: number;
   when: PredicateExpr;
+  unless?: PredicateExpr;
   single?: SingleForm;
   route?: RouteEntry[];
   modType?: string;          // single only
@@ -112,6 +113,7 @@ export const buildInstallPlan = (
   ctx: EvalContext,
 ): InstallInstruction[] => {
   if (!evalPredicateExpr(rule.when, ctx)) return [];
+  if (rule.unless !== undefined && evalPredicateExpr(rule.unless, ctx)) return [];
 
   if (rule.single) {
     const matcher = compileGlob(rule.single.anchor.pattern);

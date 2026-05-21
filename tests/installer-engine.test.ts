@@ -99,3 +99,67 @@ describe('buildInstallPlan — route form', () => {
     expect(plan.find(p => p.source === 'A/Readme.md')).toBeUndefined();
   });
 });
+
+describe('buildInstallPlan — unless predicate', () => {
+  it('returns empty plan when unless evaluates true', () => {
+    const rule: InstallerRule = {
+      id: 'pak',
+      priority: 30,
+      when: { kind: 'hasFile', glob: '**/*.pak' },
+      unless: { kind: 'hasFile', glob: '**/LogicMods/**' },
+      single: {
+        anchor: { kind: 'glob', pattern: '**/*.pak' },
+        take: 'parent',
+        placeAt: '/mods',
+      },
+      modType: 'pak',
+    };
+    const archive = ['Mod/LogicMods/Cool.pak'];
+    const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
+    expect(plan).toEqual([]);
+  });
+
+  it('returns plan normally when unless evaluates false', () => {
+    const rule: InstallerRule = {
+      id: 'pak',
+      priority: 30,
+      when: { kind: 'hasFile', glob: '**/*.pak' },
+      unless: { kind: 'hasFile', glob: '**/LogicMods/**' },
+      single: {
+        anchor: { kind: 'glob', pattern: '**/*.pak' },
+        take: 'parent',
+        placeAt: '/mods',
+      },
+      modType: 'pak',
+    };
+    const archive = ['Mod/Cool.pak'];
+    const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
+    expect(plan).toEqual([
+      { source: 'Mod/Cool.pak', destination: '/mods/Cool.pak', modType: 'pak' },
+    ]);
+  });
+
+  it('unless is composable with !any', () => {
+    const rule: InstallerRule = {
+      id: 'pak',
+      priority: 30,
+      when: { kind: 'hasFile', glob: '**/*.pak' },
+      unless: {
+        kind: 'any',
+        arms: [
+          { kind: 'hasFile', glob: '**/LogicMods/**' },
+          { kind: 'hasFile', glob: '**/Scripts/*.lua' },
+        ],
+      },
+      single: {
+        anchor: { kind: 'glob', pattern: '**/*.pak' },
+        take: 'parent',
+        placeAt: '/mods',
+      },
+      modType: 'pak',
+    };
+    const archive = ['Mod/Cool.pak', 'Mod/Scripts/main.lua'];
+    const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
+    expect(plan).toEqual([]);
+  });
+});
