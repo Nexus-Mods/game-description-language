@@ -21,8 +21,8 @@ describe('initExtension', () => {
     expect(pkg.name).toBe('game-subnautica2');
 
     const ci = readFileSync(join(dir, '.github/workflows/ci.yml'), 'utf8');
-    expect(ci).toContain('uses: ./gdl/.github/workflows/test.yml@main');
-    expect(ci).toContain('uses: ./gdl/.github/workflows/release.yml@main');
+    expect(ci).toContain('uses: Nexus-Mods/game-description-language/.github/workflows/test.yml@gdl-mvp');
+    expect(ci).toContain('uses: Nexus-Mods/game-description-language/.github/workflows/release.yml@gdl-mvp');
   });
 
   it('refuses to overwrite an existing game.yaml', async () => {
@@ -30,5 +30,17 @@ describe('initExtension', () => {
     await initExtension({ cwd: dir, gameId: 'foo', gameName: 'Foo' });
     await expect(initExtension({ cwd: dir, gameId: 'foo', gameName: 'Foo' }))
       .rejects.toThrow(/already exists/);
+  });
+
+  it('CI workflow uses the published GDL workflows by ref (not local-path)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gdl-init-ci-'));
+    await initExtension({ cwd: dir, gameId: 'helloworld', gameName: 'Hello World' });
+
+    const ci = readFileSync(join(dir, '.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toContain('uses: Nexus-Mods/game-description-language/.github/workflows/test.yml@gdl-mvp');
+    expect(ci).toContain('uses: Nexus-Mods/game-description-language/.github/workflows/release.yml@gdl-mvp');
+    // Make sure the broken form does NOT appear
+    expect(ci).not.toContain('./gdl/.github/workflows/test.yml@');
+    expect(ci).not.toContain('./gdl/.github/workflows/release.yml@');
   });
 });
