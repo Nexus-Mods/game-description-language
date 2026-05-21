@@ -199,5 +199,33 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.toolbarActions) {
+    const seen = new Set<string>();
+    for (const action of doc.toolbarActions) {
+      if (!ID_PATTERN.test(action.id)) {
+        errors.push({
+          code: 'GDL144',
+          message: `toolbarAction.id \`${action.id}\` must match ${ID_PATTERN}`,
+          span: action.span,
+        });
+      }
+      if (seen.has(action.id)) {
+        errors.push({
+          code: 'GDL143',
+          message: `duplicate toolbarAction id \`${action.id}\``,
+          span: action.span,
+        });
+      }
+      seen.add(action.id);
+      if (!action.title.trim()) {
+        errors.push({
+          code: 'GDL142',
+          message: 'toolbarAction.title is required',
+          span: action.span,
+        });
+      }
+    }
+  }
+
   return errors;
 };

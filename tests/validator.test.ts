@@ -256,4 +256,53 @@ nexus:
     const errors = validate(doc);
     expect(errors.some(e => e.code === 'GDL132')).toBe(true);
   });
+
+  it('rejects toolbar action with empty title', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+toolbarActions:
+  - id: x
+    title: ""
+    priority: 100
+    target: !openUrl https://x
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL142')).toBe(true);
+  });
+
+  it('rejects duplicate toolbar action ids', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+toolbarActions:
+  - { id: dup, title: A, priority: 100, target: !openUrl https://a }
+  - { id: dup, title: B, priority: 101, target: !openUrl https://b }
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL143')).toBe(true);
+  });
+
+  it('rejects malformed toolbar action id', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+toolbarActions:
+  - { id: "Bad Id", title: A, priority: 100, target: !openUrl https://a }
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL144')).toBe(true);
+  });
 });
