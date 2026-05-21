@@ -70,6 +70,12 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(testsGenWithUnless).toContain("it('pak archive with LogicMods present routes to logic-mod (not pak)'");
     expect(testsGenWithUnless).toContain("it('pak archive with Scripts present routes to ue4ss-lua (not pak)'");
     expect(bundle).toMatch(/unless\s*:/);
+
+    const testsGenInjector = readFileSync(join(work, '.gdl-out', 'tests.gen.ts'), 'utf8');
+    expect(testsGenInjector).toContain("it('ue4ss injector — single marker at archive root'");
+    expect(testsGenInjector).toContain("it('ue4ss injector — marker in a subfolder; sibling files dropped'");
+    expect(testsGenInjector).toContain("it('ue4ss injector — case-insensitive marker match'");
+    expect(bundle).toMatch(/['"]ue4ss-injector['"]/);
   }, 90000);
 });
 

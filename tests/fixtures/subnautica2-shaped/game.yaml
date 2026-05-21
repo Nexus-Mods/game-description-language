@@ -16,11 +16,15 @@ context:
     default: ${installPath}/SubnauticaZero/Content/Paks/~mods
   logicModsRoot: ${installPath}/SubnauticaZero/Content/Paks/LogicMods
   ue4ssModsRoot: ${installPath}/SubnauticaZero/Binaries/Win64/Mods
+  ue4ssInjectorRoot: !storeBranch
+    xbox:    ${installPath}/SubnauticaZero/Binaries/WinGDK
+    default: ${installPath}/SubnauticaZero/Binaries/Win64
 
 modTypes:
-  - { id: pak,        name: Pak Mod,       path: "${paksRoot}" }
-  - { id: logic-mod,  name: LogicMod,      path: "${logicModsRoot}" }
-  - { id: ue4ss-lua,  name: UE4SS Lua Mod, path: "${ue4ssModsRoot}" }
+  - { id: pak,           name: Pak Mod,        path: "${paksRoot}" }
+  - { id: logic-mod,     name: LogicMod,       path: "${logicModsRoot}" }
+  - { id: ue4ss-lua,     name: UE4SS Lua Mod,  path: "${ue4ssModsRoot}" }
+  - { id: ue4ss-injector, name: UE4SS Injector, path: "${ue4ssInjectorRoot}" }
 
 installers:
   - id: ue4ss-lua
@@ -49,6 +53,14 @@ installers:
     take:    parent
     placeAt: "${paksRoot}"
     modType: pak
+
+  - id: ue4ss-injector
+    priority: 15
+    when:    !hasFile "**/{dwmapi.dll,xinput1_4.dll,ue4ss-settings.ini}"
+    anchor:  "**/{dwmapi.dll,xinput1_4.dll,ue4ss-settings.ini}"
+    take:    parent
+    placeAt: "${ue4ssInjectorRoot}"
+    modType: ue4ss-injector
 
   - id: composite-mod
     priority: 99
@@ -116,6 +128,33 @@ tests:
         - Outer/Scripts/main.lua
       expect:
         matched: ue4ss-lua
+
+    - name: ue4ss injector — single marker at archive root
+      archive:
+        - dwmapi.dll
+        - ue4ss/settings.ini
+      expect:
+        matched: ue4ss-injector
+        modType: ue4ss-injector
+
+    - name: ue4ss injector — marker in a subfolder; sibling files dropped
+      archive:
+        - Pack/inject/dwmapi.dll
+        - Pack/inject/ue4ss/x.lua
+        - Pack/Readme.md
+      expect:
+        matched: ue4ss-injector
+        modType: ue4ss-injector
+        plan:
+          - ${ue4ssInjectorRoot}/dwmapi.dll
+          - ${ue4ssInjectorRoot}/ue4ss/x.lua
+
+    - name: ue4ss injector — case-insensitive marker match
+      archive:
+        - Pack/Inject/DWMAPI.DLL
+      expect:
+        matched: ue4ss-injector
+        modType: ue4ss-injector
 
 toolbarActions:
   - id: open-ue4ss-settings
