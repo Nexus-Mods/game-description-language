@@ -13,7 +13,7 @@ export const buildConfig = (cwd: string): Configuration => ({
   target: 'node',
   output: {
     path: join(cwd, 'dist'),
-    filename: 'extension.js',
+    filename: 'index.js',
     libraryTarget: 'commonjs2',
   },
   resolveLoader: {
