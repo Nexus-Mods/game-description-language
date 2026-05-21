@@ -6,19 +6,9 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
 
 ## Open
 
-### Lifecycle hooks
-
-1. **Setup hook (`prepareForModding`).** Legacy extension ensures specific mod
-   folders exist on disk the first time the game is managed. GDL's hook catalog
-   only declares `detectGameVersion`. Needs an additional catalog entry.
-
-2. **`did-deploy` event hook.** Legacy extension regenerates UE4SS `mods.txt`
-   after every deployment so UE4SS can find installed mods. No GDL hook covers
-   this.
-
 ### Discovery
 
-3. **Xbox / WinGDK arch handling beyond simple `!storeBranch`.** Legacy
+1. **Xbox / WinGDK arch handling beyond simple `!storeBranch`.** Legacy
    `ue4ssInjectorPath` chooses `Binaries/Win64/` vs `Binaries/WinGDK/` based on
    `discovery.store === 'xbox'`. GDL's `!storeBranch` can express this for a
    `modType.path`, but not for an installer's arch-specific marker recognition
@@ -26,7 +16,7 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
 
 ### Mod types
 
-4. **Per-game-instance `getPath` re-evaluation.** Legacy `registerModType`
+2. **Per-game-instance `getPath` re-evaluation.** Legacy `registerModType`
    passes a function that reads current discovery state every time Vortex asks
    for the path. GDL evaluates context bindings once at registration into a
    frozen `resolvedCtx`. For mod paths that depend on state that can change
@@ -85,6 +75,25 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
   and calls `GameStoreHelper.findByAppId(ids)` once. Vortex's own discovery
   logic picks the matching store and reports it back in the `gameStoreId`
   field. Matches the legacy idiom and lets Vortex's preference rules apply.
+
+### Lifecycle hooks
+
+- **Setup hook (`prepareForModding`).** Closed by Plan 10
+  (`2026-05-20-gdl-lifecycle-hooks.md`). YAML now supports a declarative
+  `setup: { ensureDirs: [...] }` block. Each entry is a path template
+  interpolated against the resolved context; the shim compiles them into
+  Vortex's `IGame.setup` callback, which calls `util.fs.ensureDirWritableAsync`
+  for each directory the first time the game is managed. Covers the
+  overwhelmingly common case (just ensure mod dirs exist). For setup work
+  beyond directory creation, a future `setup: { hook: !hook ... }` escape
+  hatch can be added.
+
+- **`did-deploy` event hook.** Closed by Plan 10. YAML now supports
+  `events: { did-deploy: !hook <name> }`. The hook signature is added to the
+  hook catalog (`didDeploy`). The shim registers a listener on
+  `api.events.on('did-deploy', ...)` that wraps the user's hook with a
+  context object `{ profileId, deployment, api }`. The subnautica2-shaped
+  fixture exercises it end-to-end via a `regenerateModsTxt` stub.
 
 ### UI
 
