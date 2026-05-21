@@ -59,6 +59,9 @@ installers:
     unless: !any
       - !hasFile "**/LogicMods/**"
       - !hasFile "**/Scripts/*.lua"
+      - !hasFile "**/Subnautica2/**"
+      - !hasFile "**/Engine/**"
+      - !hasFile "**/Binaries/**"
     anchor:  "**/*.pak"
     take:    parent
     placeAt: "${paksRoot}"
@@ -90,7 +93,7 @@ installers:
         modType: pak
 
   - id: root
-    priority: 24
+    priority: 40
     when: !any
       - !hasFile "**/Subnautica2/**"
       - !hasFile "**/Engine/**"
