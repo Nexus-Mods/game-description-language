@@ -91,6 +91,10 @@ const renderInstaller = (inst: InstallerNode): string => {
   if (inst.unless !== undefined) {
     parts.push(`unless: ${renderPredicate(inst.unless)}`);
   }
+  if (inst.scope?.stores && inst.scope.stores.length > 0) {
+    const storesLit = inst.scope.stores.map(s => sq(s)).join(', ');
+    parts.push(`scope: { stores: [${storesLit}] }`);
+  }
   if (inst.single) {
     parts.push(`single: { anchor: ${renderPattern(inst.single.anchor)}, take: ${renderTake(inst.single.take)}, placeAt: ${renderPlaceAt(inst.single.placeAt)} }`);
     parts.push(`modType: ${sq(inst.modType ?? '')}`);

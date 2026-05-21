@@ -272,6 +272,58 @@ game:
   });
 });
 
+describe('emit installer with scope', () => {
+  it('emits scope.stores when set', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: xbox-only
+    priority: 30
+    when: !hasFile "**/*.pak"
+    scope:
+      stores: [xbox]
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'tiny.yaml');
+    const files = emit(doc);
+    const rules = files.find(f => f.path === 'installers.gen.ts')!;
+    expect(rules.contents).toMatch(/scope:\s*\{\s*stores:\s*\[\s*'xbox'\s*\]\s*\}/);
+  });
+
+  it('does not emit scope when the YAML omits it', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'tiny.yaml');
+    const files = emit(doc);
+    const rules = files.find(f => f.path === 'installers.gen.ts')!;
+    expect(rules.contents).not.toMatch(/\bscope\s*:/);
+  });
+});
+
 describe('writeEmittedFiles', () => {
   it('writes files to .gdl-out under the target dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-emit-'));
