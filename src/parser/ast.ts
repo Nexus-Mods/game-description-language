@@ -62,6 +62,7 @@ export interface InstallerNode extends Node {
   id: string;
   priority: number;
   when: PredicateNode;
+  unless?: PredicateNode;
   // Single-anchor form OR route form. Exactly one is set.
   single?: SingleInstallerForm;
   route?: RouteEntry[];
