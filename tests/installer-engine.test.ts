@@ -250,3 +250,49 @@ describe('buildInstallPlan — install-root scoping for file anchors', () => {
     ]);
   });
 });
+
+describe('buildInstallPlan — archive-root take', () => {
+  it('preserves the full archive path as the relative destination', () => {
+    const rule: InstallerRule = {
+      id: 'root',
+      priority: 23,
+      when: { kind: 'hasFile', glob: '**/Subnautica2/**' },
+      single: {
+        anchor: { kind: 'glob', pattern: '**/*' },
+        take: 'archive-root',
+        placeAt: '/games/Hello',
+      },
+      modType: 'root',
+    };
+    const archive = [
+      'Subnautica2/Content/Paks/foo.pak',
+      'Engine/Content/bar.uasset',
+      'Readme.md',
+    ];
+    const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
+    expect(plan).toEqual([
+      { source: 'Subnautica2/Content/Paks/foo.pak', destination: '/games/Hello/Subnautica2/Content/Paks/foo.pak', modType: 'root' },
+      { source: 'Engine/Content/bar.uasset',         destination: '/games/Hello/Engine/Content/bar.uasset',         modType: 'root' },
+      { source: 'Readme.md',                          destination: '/games/Hello/Readme.md',                          modType: 'root' },
+    ]);
+  });
+
+  it('archive-root preserves nested archive structure regardless of anchor depth', () => {
+    const rule: InstallerRule = {
+      id: 'root',
+      priority: 23,
+      when: { kind: 'hasFile', glob: '**/*' },
+      single: {
+        anchor: { kind: 'glob', pattern: '**/*' },
+        take: 'archive-root',
+        placeAt: '/dest',
+      },
+      modType: 'root',
+    };
+    const archive = ['a/b/c/d.txt'];
+    const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
+    expect(plan).toEqual([
+      { source: 'a/b/c/d.txt', destination: '/dest/a/b/c/d.txt', modType: 'root' },
+    ]);
+  });
+});

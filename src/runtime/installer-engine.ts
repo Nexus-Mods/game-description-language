@@ -72,6 +72,10 @@ const stripPath = (
   anchorMatch: string,
   anchorPattern: string,
 ): string => {
+  if (take === 'archive-root') {
+    // Keep the path as-is from the archive root — no segments stripped, no filtering.
+    return path;
+  }
   if (anchorPattern.endsWith('/')) {
     // Directory-shaped anchor: find the literal dir name (last non-glob segment).
     const literalDir = anchorPattern
