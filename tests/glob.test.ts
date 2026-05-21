@@ -58,3 +58,29 @@ describe('case insensitivity', () => {
     expect(m('Pack/inject/dwmapi.dll')).toBe(true);
   });
 });
+
+describe('findShallowest', () => {
+  it('returns the matching path with the fewest segments', async () => {
+    const { findShallowest } = await import('../src/runtime/glob.js');
+    const m = compileGlob('**/dwmapi.dll');
+    const paths = [
+      'Pack/backup/old/dwmapi.dll',
+      'Pack/dwmapi.dll',
+      'Pack/sub/dwmapi.dll',
+    ];
+    expect(findShallowest(paths, m)).toBe('Pack/dwmapi.dll');
+  });
+
+  it('returns undefined when nothing matches', async () => {
+    const { findShallowest } = await import('../src/runtime/glob.js');
+    const m = compileGlob('**/nope.dll');
+    expect(findShallowest(['a.dll', 'b.dll'], m)).toBeUndefined();
+  });
+
+  it('returns the first encountered path on ties', async () => {
+    const { findShallowest } = await import('../src/runtime/glob.js');
+    const m = compileGlob('**/dwmapi.dll');
+    expect(findShallowest(['Pack/dwmapi.dll', 'Other/dwmapi.dll'], m))
+      .toBe('Pack/dwmapi.dll');
+  });
+});

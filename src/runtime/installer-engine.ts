@@ -1,4 +1,4 @@
-import { compileGlob, findFirst } from './glob.js';
+import { compileGlob, findShallowest } from './glob.js';
 import { interpolate } from './interpolate.js';
 import { evalPredicateExpr, type PredicateExpr, type EvalContext } from './predicate.js';
 
@@ -117,7 +117,7 @@ export const buildInstallPlan = (
 
   if (rule.single) {
     const matcher = compileGlob(rule.single.anchor.pattern);
-    const anchorHit = findFirst(archivePaths, matcher);
+    const anchorHit = findShallowest(archivePaths, matcher);
     if (!anchorHit) return [];
     const destRoot = interpolate(rule.single.placeAt, ctx.vars);
     const results: InstallInstruction[] = [];
@@ -140,7 +140,7 @@ export const buildInstallPlan = (
     for (const r of rule.route ?? []) {
       if (!matches(r.match, src)) continue;
       const matcher = compileGlob(r.anchor.pattern);
-      const anchorHit = findFirst(archivePaths, matcher);
+      const anchorHit = findShallowest(archivePaths, matcher);
       if (!anchorHit) break;
       const destRoot = interpolate(r.placeAt, ctx.vars);
       const relative = stripPath(src, r.take, anchorHit, r.anchor.pattern);

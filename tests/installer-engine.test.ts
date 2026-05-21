@@ -163,3 +163,34 @@ describe('buildInstallPlan — unless predicate', () => {
     expect(plan).toEqual([]);
   });
 });
+
+describe('buildInstallPlan — shallowest anchor selection', () => {
+  it('picks the shallowest matching file as the anchor, not the first in archive order', () => {
+    const rule: InstallerRule = {
+      id: 'injector',
+      priority: 15,
+      when: { kind: 'hasFile', glob: '**/dwmapi.dll' },
+      single: {
+        anchor: { kind: 'glob', pattern: '**/dwmapi.dll' },
+        take: 'parent',
+        placeAt: '/binaries',
+      },
+      modType: 'injector',
+    };
+    const archive = [
+      'Pack/backup/old/dwmapi.dll',
+      'Pack/dwmapi.dll',
+    ];
+    const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
+    expect(plan).toContainEqual({
+      source: 'Pack/dwmapi.dll',
+      destination: '/binaries/dwmapi.dll',
+      modType: 'injector',
+    });
+    expect(plan).toContainEqual({
+      source: 'Pack/backup/old/dwmapi.dll',
+      destination: '/binaries/backup/old/dwmapi.dll',
+      modType: 'injector',
+    });
+  });
+});

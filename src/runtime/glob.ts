@@ -21,3 +21,20 @@ export const findFirst = (
   for (const p of paths) if (matcher(p)) return p;
   return undefined;
 };
+
+export const findShallowest = (
+  paths: readonly string[],
+  matcher: GlobMatcher,
+): string | undefined => {
+  let best: string | undefined;
+  let bestDepth = Infinity;
+  for (const p of paths) {
+    if (!matcher(p)) continue;
+    const depth = p.split('/').length;
+    if (depth < bestDepth) {
+      best = p;
+      bestDepth = depth;
+    }
+  }
+  return best;
+};
