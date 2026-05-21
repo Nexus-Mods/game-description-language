@@ -40,13 +40,6 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
    after every deployment so UE4SS can find installed mods. No GDL hook covers
    this.
 
-### UI
-
-7. **Toolbar actions.** Legacy extensions register actions on Vortex toolbars
-   (e.g., "Open UE4SS Settings INI", "Open Nexus Page") via
-   `context.registerAction('mod-icons', priority, icon, opts, title, run, visible)`.
-   GDL does not register UI actions.
-
 ### Discovery
 
 8. **Multi-store-in-one-call `queryPath`.** Legacy extension calls
@@ -72,7 +65,14 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
 
 ## Closed
 
-(nothing yet)
+### UI
+
+7. **Toolbar actions.** Closed by Plan 6 (`2026-05-20-gdl-toolbar-actions.md`).
+   YAML now supports `toolbarActions:` with `!openFile` and `!openUrl` targets;
+   each action is registered on Vortex's `mod-icons` toolbar and is visible only
+   when the GDL-registered game is the active one. Custom click handlers (via a
+   future `!hook`) and other action groups (mods-list, gamemode-toolbar) are
+   follow-up; the current surface covers the subnautica2 port's three actions.
 
 ---
 
