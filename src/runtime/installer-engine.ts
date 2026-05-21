@@ -98,7 +98,17 @@ const stripPath = (
     .filter(s => s !== '**' && s.length > 0).length;
   const starStarExpansionDepth = anchorSegs.length - patternNonStarStarDepth;
   const dropCount = Math.max(0, starStarExpansionDepth + 1 - offset);
+
+  // Install root: the first `dropCount` segments of the anchor match.
+  // Files not under the install root are excluded (same contract as the directory-anchor branch).
+  const installRootSegs = anchorSegs.slice(0, dropCount);
   const pathSegs = splitSegments(path);
+  if (installRootSegs.length > 0) {
+    if (pathSegs.length < installRootSegs.length) return '';
+    for (let i = 0; i < installRootSegs.length; i++) {
+      if (pathSegs[i] !== installRootSegs[i]) return '';
+    }
+  }
   return joinSegments(pathSegs.slice(dropCount));
 };
 

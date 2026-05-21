@@ -194,3 +194,59 @@ describe('buildInstallPlan — shallowest anchor selection', () => {
     });
   });
 });
+
+describe('buildInstallPlan — install-root scoping for file anchors', () => {
+  it('drops files that are not under the install root', () => {
+    const rule: InstallerRule = {
+      id: 'injector',
+      priority: 15,
+      when: { kind: 'hasFile', glob: '**/dwmapi.dll' },
+      single: {
+        anchor: { kind: 'glob', pattern: '**/dwmapi.dll' },
+        take: 'parent',
+        placeAt: '/binaries',
+      },
+      modType: 'injector',
+    };
+    // Marker is `Pack/inject/dwmapi.dll` — install root is `Pack/inject`.
+    // `Pack/extras/sibling.txt` is NOT under `Pack/inject/` and must be dropped.
+    // `Pack/Readme.md` is also NOT under `Pack/inject/` and must be dropped.
+    const archive = [
+      'Pack/inject/dwmapi.dll',
+      'Pack/inject/ue4ss/x.lua',
+      'Pack/extras/sibling.txt',
+      'Pack/Readme.md',
+    ];
+    const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
+    expect(plan).toEqual([
+      { source: 'Pack/inject/dwmapi.dll',    destination: '/binaries/dwmapi.dll',    modType: 'injector' },
+      { source: 'Pack/inject/ue4ss/x.lua',  destination: '/binaries/ue4ss/x.lua',  modType: 'injector' },
+    ]);
+  });
+
+  it('keeps all files when the install root is the archive root', () => {
+    const rule: InstallerRule = {
+      id: 'injector',
+      priority: 15,
+      when: { kind: 'hasFile', glob: '**/dwmapi.dll' },
+      single: {
+        anchor: { kind: 'glob', pattern: '**/dwmapi.dll' },
+        take: 'parent',
+        placeAt: '/binaries',
+      },
+      modType: 'injector',
+    };
+    // Marker at archive root → install root is empty → no filtering.
+    const archive = [
+      'dwmapi.dll',
+      'ue4ss/x.lua',
+      'Readme.md',
+    ];
+    const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
+    expect(plan).toEqual([
+      { source: 'dwmapi.dll',  destination: '/binaries/dwmapi.dll',  modType: 'injector' },
+      { source: 'ue4ss/x.lua', destination: '/binaries/ue4ss/x.lua', modType: 'injector' },
+      { source: 'Readme.md',   destination: '/binaries/Readme.md',   modType: 'injector' },
+    ]);
+  });
+});
