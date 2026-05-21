@@ -188,6 +188,34 @@ installers:
   });
 });
 
+describe('emit installer with take: archive-root', () => {
+  const WITH_ARCHIVE_ROOT = `
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: root, name: Root, path: /game }
+installers:
+  - id: root
+    priority: 23
+    when: !hasFile "**/Subnautica2/**"
+    anchor: "**/*"
+    take: archive-root
+    placeAt: /game
+    modType: root
+`;
+
+  it("emits take: 'archive-root' as a single-quoted string literal", () => {
+    const doc = parseYaml(WITH_ARCHIVE_ROOT, 'tiny.yaml');
+    const files = emit(doc);
+    const rules = files.find(f => f.path === 'installers.gen.ts')!;
+    expect(rules.contents).toMatch(/take:\s*'archive-root'/);
+  });
+});
+
 describe('writeEmittedFiles', () => {
   it('writes files to .gdl-out under the target dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-emit-'));
