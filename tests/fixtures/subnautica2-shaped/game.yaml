@@ -104,6 +104,16 @@ installers:
     placeAt: "${installPath}"
     modType: root
 
+  - id: xbox-injector-placeholder
+    priority: 16
+    when:    !hasFile "**/xinput1_4.dll"
+    scope:
+      stores: [xbox]
+    anchor:  "**/xinput1_4.dll"
+    take:    parent
+    placeAt: "${ue4ssInjectorRoot}"
+    modType: ue4ss-injector
+
 discovery:
   version: !hook detectGameVersion
 

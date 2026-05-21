@@ -88,6 +88,9 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(bundle).toMatch(/ensureDirWritableAsync/);
     expect(bundle).toMatch(/events\.on\(['"]did-deploy['"]/);
     expect(bundle).toMatch(/regenerateModsTxt/);
+
+    expect(bundle).toMatch(/['"]xbox-injector-placeholder['"]/);
+    expect(bundle).toMatch(/scope:\s*\{\s*stores:\s*\[\s*['"]xbox['"]\s*\]\s*\}/);
   }, 90000);
 });
 
