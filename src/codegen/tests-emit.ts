@@ -17,7 +17,10 @@ const renderCase = (c: TestCaseNode): string => {
     const ctx = { archivePaths: archive, vars: flatVars };
     let matchedId: string | undefined;
     let plan: InstallInstruction[] = [];
-    for (const rule of rules) {
+    // Vortex picks the installer with the lowest priority number when multiple match.
+    // Sort by priority so the harness matches that runtime semantic.
+    const sortedRules = [...rules].sort((a, b) => a.priority - b.priority);
+    for (const rule of sortedRules) {
       const result = buildInstallPlan(rule, archive, ctx);
       if (result.length > 0) {
         matchedId = rule.id;
