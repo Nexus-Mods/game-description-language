@@ -65,6 +65,11 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(testsGen).toContain("it('logic-mod under LogicMods/'");
     expect(testsGen).toContain("it('plain pak mod'");
     expect(testsGen).toContain("it('composite — pak + lua picks composite installer'");
+
+    const testsGenWithUnless = readFileSync(join(work, '.gdl-out', 'tests.gen.ts'), 'utf8');
+    expect(testsGenWithUnless).toContain("it('pak archive with LogicMods present routes to logic-mod (not pak)'");
+    expect(testsGenWithUnless).toContain("it('pak archive with Scripts present routes to ue4ss-lua (not pak)'");
+    expect(bundle).toMatch(/unless\s*:/);
   }, 90000);
 });
 

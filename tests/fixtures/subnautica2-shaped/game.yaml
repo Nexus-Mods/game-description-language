@@ -42,6 +42,9 @@ installers:
   - id: pak
     priority: 30
     when:    !hasFile "**/*.pak"
+    unless: !any
+      - !hasFile "**/LogicMods/**"
+      - !hasFile "**/Scripts/*.lua"
     anchor:  "**/*.pak"
     take:    parent
     placeAt: "${paksRoot}"
@@ -99,6 +102,20 @@ tests:
         - A/Cool.pak
       expect:
         matched: composite-mod
+
+    - name: pak archive with LogicMods present routes to logic-mod (not pak)
+      archive:
+        - Outer/LogicMods/Inner/X.pak
+      expect:
+        matched: logic-mod
+        modType: logic-mod
+
+    - name: pak archive with Scripts present routes to ue4ss-lua (not pak)
+      archive:
+        - Outer/Cool.pak
+        - Outer/Scripts/main.lua
+      expect:
+        matched: ue4ss-lua
 
 toolbarActions:
   - id: open-ue4ss-settings
