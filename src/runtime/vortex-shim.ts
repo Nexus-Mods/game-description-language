@@ -83,7 +83,7 @@ export class GdlRuntime {
             if (v) (facts as { version?: string }).version = v;
           } catch {
             // Version detection failure is non-fatal — resolver omits `version`
-            // from the resolved context, and !versionBranch falls through to default.
+            // from the resolved context, and `versionBranch:` falls through to default.
           }
         }
         this.resolvedCtx = resolveContext(contextSpec, facts);

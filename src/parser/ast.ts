@@ -126,7 +126,7 @@ export interface HookRefNode extends Node {
 // Top-level discovery block
 export interface DiscoveryNode extends Node {
   kind: 'discovery';
-  version?: HookRefNode;       // !hook detectGameVersion
+  version?: HookRefNode;       // { hook: detectGameVersion }
 }
 
 // Test harness types
