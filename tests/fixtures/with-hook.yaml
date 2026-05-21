@@ -5,4 +5,4 @@ game:
   executable: HelloWorld.exe
   requiredFiles: [HelloWorld.exe]
 discovery:
-  version: !hook detectGameVersion
+  version: { hook: detectGameVersion }

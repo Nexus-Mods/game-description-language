@@ -10,9 +10,9 @@ toolbarActions:
   - id: open-settings
     title: Open Settings
     priority: 200
-    target: !openFile "${modsRoot}/settings.ini"
+    target: { openFile: "${modsRoot}/settings.ini" }
 
   - id: open-website
     title: Open Website
     priority: 201
-    target: !openUrl https://example.com/${gameId}
+    target: { openUrl: "https://example.com/${gameId}" }

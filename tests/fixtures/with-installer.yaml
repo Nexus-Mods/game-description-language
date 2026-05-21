@@ -11,7 +11,7 @@ modTypes:
 installers:
   - id: pak
     priority: 10
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: "${modsRoot}"

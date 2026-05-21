@@ -11,14 +11,16 @@ stores:
   xbox:  Unknown.Subnautica2
 
 context:
-  paksRoot: !storeBranch
-    xbox:    ${installPath}/Content/Paks/~mods
-    default: ${installPath}/SubnauticaZero/Content/Paks/~mods
+  paksRoot:
+    storeBranch:
+      xbox:    ${installPath}/Content/Paks/~mods
+      default: ${installPath}/SubnauticaZero/Content/Paks/~mods
   logicModsRoot: ${installPath}/SubnauticaZero/Content/Paks/LogicMods
   ue4ssModsRoot: ${installPath}/SubnauticaZero/Binaries/Win64/Mods
-  ue4ssInjectorRoot: !storeBranch
-    xbox:    ${installPath}/SubnauticaZero/Binaries/WinGDK
-    default: ${installPath}/SubnauticaZero/Binaries/Win64
+  ue4ssInjectorRoot:
+    storeBranch:
+      xbox:    ${installPath}/SubnauticaZero/Binaries/WinGDK
+      default: ${installPath}/SubnauticaZero/Binaries/Win64
 
 modTypes:
   - { id: pak,            name: Pak Mod,          path: "${paksRoot}" }
@@ -30,7 +32,7 @@ modTypes:
 installers:
   - id: ue4ss-lua
     priority: 22
-    when:    !hasFile "**/Scripts/*.lua"
+    when:    { hasFile: "**/Scripts/*.lua" }
     anchor:  "**/Scripts/*.lua"
     take:    parent.parent
     placeAt: "${ue4ssModsRoot}"
@@ -38,8 +40,8 @@ installers:
 
   - id: ue4ss-lua-enabled
     priority: 23
-    when:    !hasFile "**/enabled.txt"
-    unless:  !hasFile "**/Scripts/*.lua"
+    when:    { hasFile: "**/enabled.txt" }
+    unless:  { hasFile: "**/Scripts/*.lua" }
     anchor:  "**/enabled.txt"
     take:    parent.parent
     placeAt: "${ue4ssModsRoot}"
@@ -47,7 +49,7 @@ installers:
 
   - id: logic-mod
     priority: 20
-    when:    !hasFile "**/LogicMods/**/*.pak"
+    when:    { hasFile: "**/LogicMods/**/*.pak" }
     anchor:  "**/LogicMods/"
     take:    self
     placeAt: "${logicModsRoot}"
@@ -55,13 +57,14 @@ installers:
 
   - id: pak
     priority: 30
-    when:    !hasFile "**/*.pak"
-    unless: !any
-      - !hasFile "**/LogicMods/**"
-      - !hasFile "**/Scripts/*.lua"
-      - !hasFile "**/Subnautica2/**"
-      - !hasFile "**/Engine/**"
-      - !hasFile "**/Binaries/**"
+    when:    { hasFile: "**/*.pak" }
+    unless:
+      any:
+        - { hasFile: "**/LogicMods/**" }
+        - { hasFile: "**/Scripts/*.lua" }
+        - { hasFile: "**/Subnautica2/**" }
+        - { hasFile: "**/Engine/**" }
+        - { hasFile: "**/Binaries/**" }
     anchor:  "**/*.pak"
     take:    parent
     placeAt: "${paksRoot}"
@@ -69,7 +72,7 @@ installers:
 
   - id: ue4ss-injector
     priority: 15
-    when:    !hasFile "**/{dwmapi.dll,xinput1_4.dll,ue4ss-settings.ini}"
+    when:    { hasFile: "**/{dwmapi.dll,xinput1_4.dll,ue4ss-settings.ini}" }
     anchor:  "**/{dwmapi.dll,xinput1_4.dll,ue4ss-settings.ini}"
     take:    parent
     placeAt: "${ue4ssInjectorRoot}"
@@ -77,9 +80,10 @@ installers:
 
   - id: composite-mod
     priority: 99
-    when: !all
-      - !hasFile "**/*.pak"
-      - !hasFile "**/Scripts/*.lua"
+    when:
+      all:
+        - { hasFile: "**/*.pak" }
+        - { hasFile: "**/Scripts/*.lua" }
     route:
       - match:   "**/Scripts/*.lua"
         anchor:  "**/Scripts/"
@@ -94,14 +98,16 @@ installers:
 
   - id: root
     priority: 40
-    when: !any
-      - !hasFile "**/Subnautica2/**"
-      - !hasFile "**/Engine/**"
-      - !hasFile "**/Binaries/**"
-    unless: !any
-      - !hasFile "**/LogicMods/**"
-      - !hasFile "**/Scripts/*.lua"
-      - !hasFile "**/{dwmapi.dll,xinput1_4.dll,ue4ss-settings.ini}"
+    when:
+      any:
+        - { hasFile: "**/Subnautica2/**" }
+        - { hasFile: "**/Engine/**" }
+        - { hasFile: "**/Binaries/**" }
+    unless:
+      any:
+        - { hasFile: "**/LogicMods/**" }
+        - { hasFile: "**/Scripts/*.lua" }
+        - { hasFile: "**/{dwmapi.dll,xinput1_4.dll,ue4ss-settings.ini}" }
     anchor: "**/*"
     take: archive-root
     placeAt: "${installPath}"
@@ -109,7 +115,7 @@ installers:
 
   - id: xbox-injector-placeholder
     priority: 16
-    when:    !hasFile "**/xinput1_4.dll"
+    when:    { hasFile: "**/xinput1_4.dll" }
     scope:
       stores: [xbox]
     anchor:  "**/xinput1_4.dll"
@@ -118,7 +124,7 @@ installers:
     modType: ue4ss-injector
 
 discovery:
-  version: !hook detectGameVersion
+  version: { hook: detectGameVersion }
 
 setup:
   ensureDirs:
@@ -127,7 +133,7 @@ setup:
     - ${ue4ssModsRoot}
 
 events:
-  did-deploy: !hook regenerateModsTxt
+  did-deploy: { hook: regenerateModsTxt }
 
 tests:
   corpus: off
@@ -239,14 +245,14 @@ toolbarActions:
   - id: open-ue4ss-settings
     title: Open UE4SS Settings INI
     priority: 200
-    target: !openFile "${ue4ssModsRoot}/../UE4SS-settings.ini"
+    target: { openFile: "${ue4ssModsRoot}/../UE4SS-settings.ini" }
 
   - id: open-mods-txt
     title: Open UE4SS mods.txt
     priority: 201
-    target: !openFile "${ue4ssModsRoot}/mods.txt"
+    target: { openFile: "${ue4ssModsRoot}/mods.txt" }
 
   - id: open-nexus-page
     title: Open Nexus Page
     priority: 202
-    target: !openUrl https://www.nexusmods.com/subnautica2
+    target: { openUrl: "https://www.nexusmods.com/subnautica2" }
