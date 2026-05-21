@@ -29,3 +29,8 @@ tests:
         plan:
           - /games/Hello/Mods/Paks/CoolPak.pak
           - /games/Hello/Mods/Paks/Readme.md
+
+nexus:
+  modId: 1234
+  fileGroupId: 5678
+  displayName: Hello World Support for Vortex

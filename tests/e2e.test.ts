@@ -132,3 +132,22 @@ describe('end-to-end (corpus runner)', () => {
     await runTestCorpus({ cwd: work });
   }, 30000);
 });
+
+describe('end-to-end (package)', () => {
+  it('gdl package produces out/<id>-vortex-v<version>.zip', async () => {
+    const work = mkdtempSync(join(tmpdir(), 'gdl-package-'));
+    cpSync(join(import.meta.dirname, 'fixtures', 'e2e'), work, { recursive: true });
+
+    const { packageExtension } = await import('../src/commands/package.js');
+    const result = await packageExtension({ cwd: work });
+    expect(result.archivePath.endsWith('helloworld-vortex-v0.1.0.zip')).toBe(true);
+    expect(existsSync(result.archivePath)).toBe(true);
+
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip(result.archivePath);
+    const names = zip.getEntries().map(e => e.entryName).sort();
+    // dist/ contains extension.js + extension.js.map + info.json (per current emit).
+    expect(names).toContain('extension.js');
+    expect(names).toContain('info.json');
+  }, 60000);
+});
