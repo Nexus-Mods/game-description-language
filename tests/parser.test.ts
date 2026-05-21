@@ -139,10 +139,11 @@ modTypes:
 installers:
   - id: pak
     priority: 30
-    when: !hasFile "**/*.pak"
-    unless: !any
-      - !hasFile "**/LogicMods/**"
-      - !hasFile "**/Scripts/*.lua"
+    when: { hasFile: "**/*.pak" }
+    unless:
+      any:
+        - { hasFile: "**/LogicMods/**" }
+        - { hasFile: "**/Scripts/*.lua" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -170,7 +171,7 @@ modTypes:
 installers:
   - id: pak
     priority: 30
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -192,7 +193,7 @@ modTypes:
 installers:
   - id: root
     priority: 23
-    when: !hasFile "**/Subnautica2/**"
+    when: { hasFile: "**/Subnautica2/**" }
     anchor: "**/*"
     take: archive-root
     placeAt: /game
@@ -231,7 +232,7 @@ game:
   executable: HelloWorld.exe
   requiredFiles: [HelloWorld.exe]
 events:
-  did-deploy: !hook regenerateMetadata
+  did-deploy: { hook: regenerateMetadata }
 `, 'inline.yaml');
     expect(doc.events).toBeDefined();
     expect(doc.events!.didDeploy).toBeDefined();
@@ -252,7 +253,7 @@ modTypes:
 installers:
   - id: xbox-only
     priority: 30
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     scope:
       stores: [xbox]
     anchor: "**/*.pak"
@@ -278,7 +279,7 @@ modTypes:
 installers:
   - id: pak
     priority: 30
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a

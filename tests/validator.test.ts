@@ -73,7 +73,7 @@ modTypes:
 installers:
   - id: pak
     priority: 10
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -96,14 +96,14 @@ modTypes:
 installers:
   - id: pak
     priority: 10
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
     modType: pak
   - id: pak
     priority: 20
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -127,7 +127,7 @@ modTypes:
 installers:
   - id: pak
     priority: 10
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -151,7 +151,7 @@ modTypes:
 installers:
   - id: pak
     priority: 10
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -179,7 +179,7 @@ modTypes:
 installers:
   - id: pak
     priority: 10
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -207,7 +207,7 @@ modTypes:
 installers:
   - id: pak
     priority: 10
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -269,7 +269,7 @@ toolbarActions:
   - id: x
     title: ""
     priority: 100
-    target: !openUrl https://x
+    target: { openUrl: "https://x" }
 `);
     const errors = validate(doc);
     expect(errors.some(e => e.code === 'GDL142')).toBe(true);
@@ -284,8 +284,8 @@ game:
   executable: HelloWorld.exe
   requiredFiles: [HelloWorld.exe]
 toolbarActions:
-  - { id: dup, title: A, priority: 100, target: !openUrl https://a }
-  - { id: dup, title: B, priority: 101, target: !openUrl https://b }
+  - { id: dup, title: A, priority: 100, target: { openUrl: "https://a" } }
+  - { id: dup, title: B, priority: 101, target: { openUrl: "https://b" } }
 `);
     const errors = validate(doc);
     expect(errors.some(e => e.code === 'GDL143')).toBe(true);
@@ -300,7 +300,7 @@ game:
   executable: HelloWorld.exe
   requiredFiles: [HelloWorld.exe]
 toolbarActions:
-  - { id: "Bad Id", title: A, priority: 100, target: !openUrl https://a }
+  - { id: "Bad Id", title: A, priority: 100, target: { openUrl: "https://a" } }
 `);
     const errors = validate(doc);
     expect(errors.some(e => e.code === 'GDL144')).toBe(true);
@@ -347,7 +347,7 @@ game:
   executable: X.exe
   requiredFiles: [X.exe]
 events:
-  did-deploy: !hook regenerateMetadata
+  did-deploy: { hook: regenerateMetadata }
 `);
     const errors = validate(doc);
     expect(errors).toEqual([]);

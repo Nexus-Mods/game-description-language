@@ -55,7 +55,7 @@ modTypes:
 installers:
   - id: pak
     priority: 10
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: "${'${modsRoot}'}"
@@ -89,7 +89,7 @@ game:
   executable: HelloWorld.exe
   requiredFiles: [HelloWorld.exe]
 discovery:
-  version: !hook detectGameVersion
+  version: { hook: detectGameVersion }
 `;
 
   it('emits hook import and passes version hook to registerGame', () => {
@@ -113,11 +113,11 @@ toolbarActions:
   - id: open-settings
     title: Open Settings
     priority: 200
-    target: !openFile /games/Hello/settings.ini
+    target: { openFile: "/games/Hello/settings.ini" }
   - id: open-website
     title: Open Website
     priority: 201
-    target: !openUrl https://example.com/x
+    target: { openUrl: "https://example.com/x" }
 `;
 
   it('emits toolbar action registrations in extension.ts', () => {
@@ -147,8 +147,8 @@ modTypes:
 installers:
   - id: pak
     priority: 30
-    when: !hasFile "**/*.pak"
-    unless: !hasFile "**/LogicMods/**"
+    when: { hasFile: "**/*.pak" }
+    unless: { hasFile: "**/LogicMods/**" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -175,7 +175,7 @@ modTypes:
 installers:
   - id: pak
     priority: 30
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
@@ -201,7 +201,7 @@ modTypes:
 installers:
   - id: root
     priority: 23
-    when: !hasFile "**/Subnautica2/**"
+    when: { hasFile: "**/Subnautica2/**" }
     anchor: "**/*"
     take: archive-root
     placeAt: /game
@@ -247,7 +247,7 @@ game:
   executable: HelloWorld.exe
   requiredFiles: [HelloWorld.exe]
 events:
-  did-deploy: !hook regenerateMetadata
+  did-deploy: { hook: regenerateMetadata }
 `, 'tiny.yaml');
     const files = emit(doc);
     const ext = files.find(f => f.path === 'extension.ts')!;
@@ -286,7 +286,7 @@ modTypes:
 installers:
   - id: xbox-only
     priority: 30
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     scope:
       stores: [xbox]
     anchor: "**/*.pak"
@@ -312,7 +312,7 @@ modTypes:
 installers:
   - id: pak
     priority: 30
-    when: !hasFile "**/*.pak"
+    when: { hasFile: "**/*.pak" }
     anchor: "**/*.pak"
     take: parent
     placeAt: /a
