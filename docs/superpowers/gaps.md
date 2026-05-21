@@ -15,36 +15,31 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
    `anchor: "**/Scripts/"` + `take: parent` which handles the common case but
    misses irregular archives.
 
-2. **UE4SS injector installer pattern.** Find one of several marker DLLs, take
-   the directory containing it, route to an arch-aware destination (e.g.,
-   `Binaries/Win64/` vs `Binaries/WinGDK/`). None of the three pieces are
-   expressible today. Omitted from the port.
-
-3. **`root` installer.** "Take everything as-is from the archive root, but only
+2. **`root` installer.** "Take everything as-is from the archive root, but only
    if no other installer wins." Now expressible using `unless:` (closed in
    Plan 7) once added to a real port — see Plan 7's note about exposing it in
    the subnautica2 port as a follow-up.
 
 ### Lifecycle hooks
 
-4. **Setup hook (`prepareForModding`).** Legacy extension ensures specific mod
+3. **Setup hook (`prepareForModding`).** Legacy extension ensures specific mod
    folders exist on disk the first time the game is managed. GDL's hook catalog
    only declares `detectGameVersion`. Needs an additional catalog entry.
 
-5. **`did-deploy` event hook.** Legacy extension regenerates UE4SS `mods.txt`
+4. **`did-deploy` event hook.** Legacy extension regenerates UE4SS `mods.txt`
    after every deployment so UE4SS can find installed mods. No GDL hook covers
    this.
 
 ### Discovery
 
-6. **Multi-store-in-one-call `queryPath`.** Legacy extension calls
+5. **Multi-store-in-one-call `queryPath`.** Legacy extension calls
    `util.GameStoreHelper.findByAppId([STEAMAPP_ID, EPIC_CATALOG_ITEM_ID])` —
    passing all IDs in a single call. GDL's runtime iterates stores and calls
    `findByAppId(appId, storeId)` once per store. Semantics are similar but not
    identical (Vortex's array form has fallback rules our per-store loop doesn't
    express).
 
-7. **Xbox / WinGDK arch handling beyond simple `!storeBranch`.** Legacy
+6. **Xbox / WinGDK arch handling beyond simple `!storeBranch`.** Legacy
    `ue4ssInjectorPath` chooses `Binaries/Win64/` vs `Binaries/WinGDK/` based on
    `discovery.store === 'xbox'`. GDL's `!storeBranch` can express this for a
    `modType.path`, but not for an installer's arch-specific marker recognition
@@ -52,7 +47,7 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
 
 ### Mod types
 
-8. **Per-game-instance `getPath` re-evaluation.** Legacy `registerModType`
+7. **Per-game-instance `getPath` re-evaluation.** Legacy `registerModType`
    passes a function that reads current discovery state every time Vortex asks
    for the path. GDL evaluates context bindings once at registration into a
    frozen `resolvedCtx`. For mod paths that depend on state that can change
@@ -70,6 +65,16 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
   typically `!any` of `!hasFile` patterns pointing at signals for a narrower
   installer. The subnautica2-shaped fixture now demonstrates `pak`
   disqualifying itself when LogicMods or Scripts are present.
+
+- **UE4SS injector installer pattern.** Closed by Plan 8
+  (`2026-05-20-gdl-installer-engine-refinements.md`). Three engine
+  refinements unlock the pattern: case-insensitive glob matching by default
+  (matches Windows filesystem semantics); shallowest-matching file selected
+  as the anchor (vs. archive-order-first); and file-anchor installers now
+  scope routing to files under the install root, dropping outsiders.
+  Combined with brace-expansion globs (`**/{a,b,c}`) and `!storeBranch` for
+  arch-aware destinations, the legacy `ue4ssInjectorSpec` is now ~12 lines
+  of YAML. The subnautica2-shaped fixture exercises it end-to-end.
 
 ### UI
 
