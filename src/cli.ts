@@ -4,6 +4,7 @@ import { buildExtension, reportBuildError } from './commands/build.js';
 import { packageExtension } from './commands/package.js';
 import { runTestCorpus } from './commands/test-corpus.js';
 import { resolvePublishInfo, type PublishInfoField } from './commands/publish-info.js';
+import { initExtension } from './commands/init.js';
 
 const program = new Command();
 program
@@ -76,6 +77,22 @@ program
     try {
       const value = await resolvePublishInfo(process.cwd(), field as PublishInfoField);
       process.stdout.write(value);   // no trailing newline — CI consumes raw
+    } catch (err) {
+      process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('init <gameId>')
+  .description('Scaffold a new GDL extension repo for a game')
+  .option('-n, --name <name>', 'human-friendly game name', '')
+  .action(async (gameId: string, opts: { name?: string }) => {
+    try {
+      const gameName = opts.name && opts.name.trim() ? opts.name : gameId;
+      await initExtension({ cwd: process.cwd(), gameId, gameName });
+      process.stdout.write(`Scaffolded ${gameId} in ${process.cwd()}\n`);
+      process.stdout.write(`Next: add the GDL submodule with: git submodule add https://github.com/Nexus-Mods/game-description-language gdl\n`);
     } catch (err) {
       process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
       process.exit(1);
