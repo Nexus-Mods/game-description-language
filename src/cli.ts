@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { buildExtension, reportBuildError } from './commands/build.js';
 import { packageExtension } from './commands/package.js';
 import { runTestCorpus } from './commands/test-corpus.js';
+import { resolvePublishInfo, type PublishInfoField } from './commands/publish-info.js';
 
 const program = new Command();
 program
@@ -64,6 +65,19 @@ program
     } catch (err) {
       const { reportBuildError } = await import('./commands/build.js');
       process.stderr.write(reportBuildError(err) + '\n');
+      process.exit(1);
+    }
+  });
+
+program
+  .command('publish-info <field>')
+  .description('Print a release-pipeline metadata value from game.yaml. Fields: mod-id, file-group-id, display-name, version, zip-name')
+  .action(async (field: string) => {
+    try {
+      const value = await resolvePublishInfo(process.cwd(), field as PublishInfoField);
+      process.stdout.write(value);   // no trailing newline — CI consumes raw
+    } catch (err) {
+      process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
       process.exit(1);
     }
   });
