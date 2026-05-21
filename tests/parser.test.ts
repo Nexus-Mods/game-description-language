@@ -238,4 +238,52 @@ events:
     expect(doc.events!.didDeploy!.kind).toBe('hookRef');
     expect(doc.events!.didDeploy!.hookId).toBe('regenerateMetadata');
   });
+
+  it('parses installer with scope.stores', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: xbox-only
+    priority: 30
+    when: !hasFile "**/*.pak"
+    scope:
+      stores: [xbox]
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml');
+    const inst = doc.installers![0]!;
+    expect(inst.scope).toBeDefined();
+    expect(inst.scope!.stores).toEqual(['xbox']);
+  });
+
+  it('leaves installer.scope undefined when the YAML omits it', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml');
+    expect(doc.installers![0]!.scope).toBeUndefined();
+  });
 });

@@ -1,7 +1,7 @@
 import { parseDocument, type Document, type Node as YamlNode, isMap, isSeq, isScalar, isPair } from 'yaml';
 import type {
   DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode,
-  InstallerNode, SingleInstallerForm, RouteEntry, TakeStrategy,
+  InstallerNode, InstallerScope, SingleInstallerForm, RouteEntry, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode, NexusNode,
   ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode,
@@ -443,6 +443,27 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
       const unlessYaml = entry.get('unless', true);
       const unless = unlessYaml ? parsePredicate(unlessYaml as YamlNode, file, source) : undefined;
 
+      const scopeYaml = entry.get('scope', true);
+      let scope: InstallerScope | undefined;
+      if (isMap(scopeYaml)) {
+        const storesYaml = scopeYaml.get('stores', true);
+        const stores: string[] = [];
+        if (isSeq(storesYaml)) {
+          for (const item of storesYaml.items) {
+            if (isScalar(item) && typeof item.value === 'string') {
+              stores.push(item.value);
+            } else {
+              throw new BuildErrors([{
+                code: 'GDL160',
+                message: 'installer.scope.stores entries must be strings',
+                span: spanOf(file, source, item as YamlNode),
+              }]);
+            }
+          }
+        }
+        scope = { ...(stores.length > 0 && { stores }) };
+      }
+
       const routeYaml = entry.get('route', true);
       let single: SingleInstallerForm | undefined;
       let route: RouteEntry[] | undefined;
@@ -479,10 +500,11 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
         id,
         priority,
         when,
-        ...(unless   !== undefined && { unless }),
-        ...(single   !== undefined && { single }),
-        ...(route    !== undefined && { route }),
-        ...(modType  !== undefined && { modType }),
+        ...(unless !== undefined && { unless }),
+        ...(scope  !== undefined && { scope }),
+        ...(single !== undefined && { single }),
+        ...(route  !== undefined && { route }),
+        ...(modType !== undefined && { modType }),
         span: spanOf(file, source, entry),
       });
     }

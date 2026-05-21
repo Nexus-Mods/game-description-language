@@ -65,11 +65,16 @@ export interface InstallerNode extends Node {
   priority: number;
   when: PredicateNode;
   unless?: PredicateNode;
+  scope?: InstallerScope;
   // Single-anchor form OR route form. Exactly one is set.
   single?: SingleInstallerForm;
   route?: RouteEntry[];
   // modType only required for single form; route entries carry their own modType.
   modType?: string;
+}
+
+export interface InstallerScope {
+  stores?: string[];
 }
 
 export interface SingleInstallerForm {
