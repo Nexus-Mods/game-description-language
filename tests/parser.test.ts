@@ -286,4 +286,104 @@ installers:
 `, 'inline.yaml');
     expect(doc.installers![0]!.scope).toBeUndefined();
   });
+
+  it('parses object-form { hasFile: pattern }', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+modTypes:
+  - { id: pak, name: Pak, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when: { hasFile: "**/*.pak" }
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml');
+    expect(doc.installers![0]!.when.kind).toBe('hasFile');
+  });
+
+  it('parses object-form { any: [...] } combinator', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+modTypes:
+  - { id: pak, name: Pak, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when:
+      any:
+        - { hasFile: "**/a" }
+        - { hasFile: "**/b" }
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml');
+    const w = doc.installers![0]!.when;
+    expect(w.kind).toBe('any');
+    if (w.kind !== 'any') return;
+    expect(w.arms).toHaveLength(2);
+    expect(w.arms[0]!.kind).toBe('hasFile');
+  });
+
+  it('parses object-form { not: <predicate> } combinator', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+modTypes:
+  - { id: pak, name: Pak, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when:
+      not:
+        hasFile: "**/skip"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml');
+    const w = doc.installers![0]!.when;
+    expect(w.kind).toBe('not');
+  });
+
+  it('rejects object-form predicates with multiple discriminator keys', () => {
+    expect(() => parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+modTypes:
+  - { id: pak, name: Pak, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when:
+      hasFile: "**/*.pak"
+      any:
+        - { hasFile: a }
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml')).toThrow();
+  });
 });

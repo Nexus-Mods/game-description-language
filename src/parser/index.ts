@@ -209,6 +209,51 @@ const parsePredicate = (node: YamlNode | null | undefined, file: string, source:
     }
   }
 
+  // Object form: single-key discriminator object.
+  if (isMap(node) && (typeof tag !== 'string' || tag === '')) {
+    const keys: string[] = [];
+    for (const item of node.items) {
+      if (isScalar(item.key) && typeof item.key.value === 'string') {
+        keys.push(item.key.value);
+      }
+    }
+
+    const PRED_KEYS = ['hasFile', 'hasFiles', 'matches', 'any', 'all', 'not'];
+    const matched = keys.filter(k => PRED_KEYS.includes(k));
+    if (matched.length > 1) {
+      throw new BuildErrors([{
+        code: 'GDL170',
+        message: `predicate object must have exactly one discriminator key; got [${matched.join(', ')}]`,
+        span,
+      }]);
+    }
+    if (matched.length === 1) {
+      const key = matched[0]!;
+      const value = node.get(key, true);
+      if (key === 'hasFile') {
+        return { kind: 'hasFile', pattern: parsePattern(value as YamlNode, file, source), span };
+      }
+      if (key === 'hasFiles' && isSeq(value)) {
+        const patterns = value.items.map(i => parsePattern(i as YamlNode, file, source));
+        return { kind: 'hasFiles', patterns, span };
+      }
+      if (key === 'matches') {
+        return { kind: 'matches', pattern: parsePattern(value as YamlNode, file, source), span };
+      }
+      if (key === 'any' && isSeq(value)) {
+        const arms = value.items.map(i => parsePredicate(i as YamlNode, file, source));
+        return { kind: 'any', arms, span };
+      }
+      if (key === 'all' && isSeq(value)) {
+        const arms = value.items.map(i => parsePredicate(i as YamlNode, file, source));
+        return { kind: 'all', arms, span };
+      }
+      if (key === 'not') {
+        return { kind: 'not', arm: parsePredicate(value as YamlNode, file, source), span };
+      }
+    }
+  }
+
   throw new BuildErrors([{
     code: 'GDL042',
     message: 'expected a predicate (`!hasFile`/`!hasFiles`/`!matches`/`!when`/`!any`/`!all`/`!not`)',
