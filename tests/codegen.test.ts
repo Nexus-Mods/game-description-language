@@ -101,6 +101,39 @@ discovery:
   });
 });
 
+describe('emit toolbar actions', () => {
+  const TINY = `
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+toolbarActions:
+  - id: open-settings
+    title: Open Settings
+    priority: 200
+    target: !openFile /games/Hello/settings.ini
+  - id: open-website
+    title: Open Website
+    priority: 201
+    target: !openUrl https://example.com/x
+`;
+
+  it('emits toolbar action registrations in extension.ts', () => {
+    const doc = parseYaml(TINY, 'tiny.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path === 'extension.ts')!;
+    expect(ext.contents).toContain("id: 'open-settings'");
+    expect(ext.contents).toContain("title: 'Open Settings'");
+    expect(ext.contents).toContain("priority: 200");
+    expect(ext.contents).toContain("kind: 'openFile'");
+    expect(ext.contents).toContain("template: '/games/Hello/settings.ini'");
+    expect(ext.contents).toContain("kind: 'openUrl'");
+    expect(ext.contents).toContain("template: 'https://example.com/x'");
+  });
+});
+
 describe('writeEmittedFiles', () => {
   it('writes files to .gdl-out under the target dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-emit-'));
