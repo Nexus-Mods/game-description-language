@@ -8,13 +8,7 @@ import type {
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
-import {
-  BRANCH_TAG_NAMES, type BranchTagName,
-  PATTERN_TAG_NAMES, type PatternTagName,
-  PREDICATE_TAG_NAMES, type PredicateTagName,
-  HOOK_TAG,
-  customTags,
-} from './tags.js';
+import { customTags } from './tags.js';
 
 const spanOf = (file: string, source: string, node: YamlNode | null | undefined): YamlSpan => {
   const range = (node as { range?: [number, number, number] } | null)?.range;
@@ -33,20 +27,12 @@ const STORE_IDS = new Set<StoreId>([
 
 const isInterpolated = (s: string): boolean => s.includes('${');
 
-const tagToKind = (tag: BranchTagName): 'storeBranch' | 'osBranch' | 'versionBranch' =>
-  tag === '!storeBranch' ? 'storeBranch'
-  : tag === '!osBranch' ? 'osBranch'
-  : 'versionBranch';
-
 const keyToKind = (key: string): 'storeBranch' | 'osBranch' | 'versionBranch' =>
   key === 'storeBranch' ? 'storeBranch'
   : key === 'osBranch' ? 'osBranch'
   : 'versionBranch';
 
 const parseHookRef = (node: YamlNode | null | undefined, file: string, source: string): HookRefNode => {
-  if (isScalar(node) && (node as { tag?: unknown }).tag === HOOK_TAG && typeof node.value === 'string') {
-    return { kind: 'hookRef', hookId: node.value, span: spanOf(file, source, node) };
-  }
   // Object form: { hook: <name> }
   if (isMap(node) && node.items.length === 1) {
     const pair = node.items[0]!;
@@ -57,7 +43,7 @@ const parseHookRef = (node: YamlNode | null | undefined, file: string, source: s
   }
   throw new BuildErrors([{
     code: 'GDL060',
-    message: 'expected `!hook <id>` reference',
+    message: 'expected a hook reference object: { hook: <id> }',
     span: spanOf(file, source, node ?? null),
   }]);
 };
@@ -90,18 +76,6 @@ const parseBranchArms = (
 
 const parseValueNode = (node: YamlNode | null | undefined, file: string, source: string): ValueNode => {
   const span = spanOf(file, source, node ?? null);
-
-  // Hook reference: scalar with !hook tag.
-  if (isScalar(node) && (node as { tag?: unknown }).tag === HOOK_TAG && typeof node.value === 'string') {
-    return { kind: 'hookRef', hookId: node.value, span };
-  }
-
-  // Branch tag: tagged YAMLMap with one of the known branch tag names.
-  if (isMap(node) && typeof node.tag === 'string' && BRANCH_TAG_NAMES.has(node.tag as BranchTagName)) {
-    const tag = node.tag as BranchTagName;
-    const { arms, default: defaultArm } = parseBranchArms(node, tag, span, file, source);
-    return { kind: tagToKind(tag), arms, default: defaultArm, span };
-  }
 
   // Object form for branches: { storeBranch | osBranch | versionBranch: { arm: value, ... } }
   if (isMap(node) && (typeof node.tag !== 'string' || node.tag === '')) {
@@ -140,7 +114,7 @@ const parseValueNode = (node: YamlNode | null | undefined, file: string, source:
 
   throw new BuildErrors([{
     code: 'GDL020',
-    message: 'unsupported value (expected scalar literal, interpolated string, or branch tag)',
+    message: 'unsupported value (expected scalar literal, interpolated string, or branch object)',
     span,
   }]);
 };
@@ -148,8 +122,6 @@ const parseValueNode = (node: YamlNode | null | undefined, file: string, source:
 const parsePattern = (node: YamlNode | null | undefined, file: string, source: string): PatternNode => {
   const span = spanOf(file, source, node ?? null);
   if (isScalar(node) && typeof node.value === 'string') {
-    const tag = typeof node.tag === 'string' ? node.tag : '!hasFile';
-    if (tag === '!matches') return { kind: 'regex', pattern: node.value, span };
     return { kind: 'glob', pattern: node.value, span };
   }
   throw new BuildErrors([{
@@ -231,35 +203,9 @@ const parseComparison = (node: YamlNode, file: string, source: string): Comparis
 
 const parsePredicate = (node: YamlNode | null | undefined, file: string, source: string): PredicateNode => {
   const span = spanOf(file, source, node ?? null);
-  const tag = (node as { tag?: unknown } | null)?.tag;
-
-  if (typeof tag === 'string') {
-    if (tag === '!hasFile') {
-      return { kind: 'hasFile', pattern: parsePattern(node, file, source), span };
-    }
-    if (tag === '!hasFiles' && isSeq(node)) {
-      const patterns = node.items.map(i => parsePattern(i as YamlNode, file, source));
-      return { kind: 'hasFiles', patterns, span };
-    }
-    if (tag === '!matches') {
-      return { kind: 'matches', pattern: parsePattern(node, file, source), span };
-    }
-    if (tag === '!any' && isSeq(node)) {
-      return { kind: 'any', arms: node.items.map(i => parsePredicate(i as YamlNode, file, source)), span };
-    }
-    if (tag === '!all' && isSeq(node)) {
-      return { kind: 'all', arms: node.items.map(i => parsePredicate(i as YamlNode, file, source)), span };
-    }
-    if (tag === '!not' && isSeq(node) && node.items.length === 1) {
-      return { kind: 'not', arm: parsePredicate(node.items[0] as YamlNode, file, source), span };
-    }
-    if (tag === '!when' && isMap(node)) {
-      return { kind: 'when', expr: parseComparison(node, file, source), span };
-    }
-  }
 
   // Object form: single-key discriminator object.
-  if (isMap(node) && (typeof tag !== 'string' || tag === '')) {
+  if (isMap(node)) {
     const keys: string[] = [];
     for (const item of node.items) {
       if (isScalar(item.key) && typeof item.key.value === 'string') {
@@ -305,7 +251,7 @@ const parsePredicate = (node: YamlNode | null | undefined, file: string, source:
 
   throw new BuildErrors([{
     code: 'GDL042',
-    message: 'expected a predicate (`!hasFile`/`!hasFiles`/`!matches`/`!when`/`!any`/`!all`/`!not`)',
+    message: 'expected a predicate object with one of: hasFile, hasFiles, matches, any, all, not',
     span,
   }]);
 };
@@ -376,11 +322,6 @@ const parseTestsBlock = (node: YamlNode, file: string, source: string): TestsNod
 
 const parseToolbarActionTarget = (node: YamlNode, file: string, source: string): ToolbarActionTarget => {
   const span = spanOf(file, source, node);
-  if (isScalar(node) && typeof node.value === 'string') {
-    const tag = typeof node.tag === 'string' ? node.tag : '';
-    if (tag === '!openFile') return { kind: 'openFile', template: node.value };
-    if (tag === '!openUrl')  return { kind: 'openUrl',  template: node.value };
-  }
   if (isMap(node) && (typeof node.tag !== 'string' || node.tag === '')) {
     if (node.items.length === 1) {
       const pair = node.items[0]!;
@@ -394,7 +335,7 @@ const parseToolbarActionTarget = (node: YamlNode, file: string, source: string):
   }
   throw new BuildErrors([{
     code: 'GDL140',
-    message: 'toolbar action `target:` must be `!openFile <path>` or `!openUrl <url>`',
+    message: 'toolbar action `target:` must be `{ openFile: <path> }` or `{ openUrl: <url> }`',
     span,
   }]);
 };

@@ -493,4 +493,25 @@ toolbarActions:
       template: 'https://nexusmods.com',
     });
   });
+
+  it('rejects tag-form YAML (tags no longer supported)', () => {
+    expect(() => parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+modTypes:
+  - { id: pak, name: Pak, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml')).toThrow();
+  });
 });
