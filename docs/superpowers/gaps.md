@@ -6,21 +6,7 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
 
 ## Open
 
-### Discovery
-
-1. **Xbox / WinGDK arch handling beyond simple `!storeBranch`.** Legacy
-   `ue4ssInjectorPath` chooses `Binaries/Win64/` vs `Binaries/WinGDK/` based on
-   `discovery.store === 'xbox'`. GDL's `!storeBranch` can express this for a
-   `modType.path`, but not for an installer's arch-specific marker recognition
-   (e.g., looking for `xinput1_4.dll` vs a different marker on Xbox).
-
-### Mod types
-
-2. **Per-game-instance `getPath` re-evaluation.** Legacy `registerModType`
-   passes a function that reads current discovery state every time Vortex asks
-   for the path. GDL evaluates context bindings once at registration into a
-   frozen `resolvedCtx`. For mod paths that depend on state that can change
-   after first-discovery (rare but possible), GDL needs a re-evaluation seam.
+(none — all gaps surfaced by the subnautica2 port are closed)
 
 ## Closed
 
@@ -76,6 +62,14 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
   logic picks the matching store and reports it back in the `gameStoreId`
   field. Matches the legacy idiom and lets Vortex's preference rules apply.
 
+- **Xbox / WinGDK arch handling beyond simple `!storeBranch`.** Closed by
+  Plan 11 (`2026-05-21-gdl-final-gaps.md`). Installer rules now accept an
+  optional `scope: { stores: [...] }` field. When set, the shim's installer
+  dispatcher checks the discovered store against the scope before consulting
+  the engine. Combined with brace-expansion globs and `!storeBranch` for
+  destination paths, the full "different markers on different platforms"
+  pattern is expressible as N store-scoped installers with the same priority.
+
 ### Lifecycle hooks
 
 - **Setup hook (`prepareForModding`).** Closed by Plan 10
@@ -104,7 +98,15 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
   future `!hook`) and other action groups (mods-list, gamemode-toolbar) are
   follow-up; the current surface covers the subnautica2 port's three actions.
 
+### Mod types
+
+- **Per-game-instance `getPath` re-evaluation.** Closed by Plan 11. The
+  shim's `IModType.getPath` callback now re-interpolates the path template
+  on each call, overriding the resolved-context's `installPath` with the
+  current game's `gamePath`. Re-discovery after Vortex updates the game's
+  path is now reflected on the next path query.
+
 ---
 
-Source for the open items: subnautica2 port (`gdl-port` branch of
+Source for the closed items: subnautica2 port (`gdl-port` branch of
 `Nexus-Mods/game-subnautica2`, see its `GAPS.md`).
