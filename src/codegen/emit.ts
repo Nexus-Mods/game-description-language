@@ -88,6 +88,9 @@ const renderInstaller = (inst: InstallerNode): string => {
     `priority: ${inst.priority}`,
     `when: ${renderPredicate(inst.when)}`,
   ];
+  if (inst.unless !== undefined) {
+    parts.push(`unless: ${renderPredicate(inst.unless)}`);
+  }
   if (inst.single) {
     parts.push(`single: { anchor: ${renderPattern(inst.single.anchor)}, take: ${renderTake(inst.single.take)}, placeAt: ${renderPlaceAt(inst.single.placeAt)} }`);
     parts.push(`modType: ${sq(inst.modType ?? '')}`);

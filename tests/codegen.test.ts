@@ -134,6 +134,60 @@ toolbarActions:
   });
 });
 
+describe('emit installer with unless', () => {
+  const WITH_UNLESS = `
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when: !hasFile "**/*.pak"
+    unless: !hasFile "**/LogicMods/**"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`;
+
+  it('emits unless field on installer when present', () => {
+    const doc = parseYaml(WITH_UNLESS, 'tiny.yaml');
+    const files = emit(doc);
+    const rules = files.find(f => f.path === 'installers.gen.ts')!;
+    expect(rules.contents).toMatch(/unless:\s*\{ kind: 'hasFile', glob: '\*\*\/LogicMods\/\*\*' \}/);
+  });
+
+  it('does not emit unless when the YAML omits it', () => {
+    const noUnless = `
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`;
+    const doc = parseYaml(noUnless, 'tiny.yaml');
+    const files = emit(doc);
+    const rules = files.find(f => f.path === 'installers.gen.ts')!;
+    expect(rules.contents).not.toMatch(/\bunless\s*:/);
+  });
+});
+
 describe('writeEmittedFiles', () => {
   it('writes files to .gdl-out under the target dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-emit-'));
