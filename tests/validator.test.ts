@@ -305,4 +305,51 @@ toolbarActions:
     const errors = validate(doc);
     expect(errors.some(e => e.code === 'GDL144')).toBe(true);
   });
+
+  it('rejects setup.ensureDirs with empty entry', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+setup:
+  ensureDirs:
+    - ""
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL152')).toBe(true);
+  });
+
+  it('accepts setup.ensureDirs with non-empty templates', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+setup:
+  ensureDirs:
+    - \${installPath}/Mods
+`);
+    const errors = validate(doc);
+    expect(errors).toEqual([]);
+  });
+
+  it('accepts events.did-deploy with hook reference', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+events:
+  did-deploy: !hook regenerateMetadata
+`);
+    const errors = validate(doc);
+    expect(errors).toEqual([]);
+  });
 });

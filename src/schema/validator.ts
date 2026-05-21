@@ -227,5 +227,19 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.setup) {
+    for (let i = 0; i < doc.setup.ensureDirs.length; i++) {
+      if (doc.setup.ensureDirs[i]!.trim() === '') {
+        errors.push({
+          code: 'GDL152',
+          message: `setup.ensureDirs[${i}] must not be empty`,
+          span: doc.setup.span,
+        });
+      }
+    }
+  }
+  // events.did-deploy: structural validation done in parser.
+  // Hook resolution happens in the build step (alongside discovery.version's hook).
+
   return errors;
 };
