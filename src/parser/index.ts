@@ -113,12 +113,12 @@ const parsePattern = (node: YamlNode | null | undefined, file: string, source: s
 const parseTakeStrategy = (node: YamlNode | null | undefined, file: string, source: string): TakeStrategy => {
   if (isScalar(node)) {
     const v = node.value;
-    if (v === 'self' || v === 'parent' || v === 'parent.parent') return v;
+    if (v === 'self' || v === 'parent' || v === 'parent.parent' || v === 'archive-root') return v;
     if (typeof v === 'number' && Number.isInteger(v) && v >= 0) return { depth: v };
   }
   throw new BuildErrors([{
     code: 'GDL041',
-    message: '`take:` must be one of `self`, `parent`, `parent.parent`, or a non-negative integer depth',
+    message: '`take:` must be one of `self`, `parent`, `parent.parent`, `archive-root`, or a non-negative integer depth',
     span: spanOf(file, source, node ?? null),
   }]);
 };

@@ -2,7 +2,7 @@ import { compileGlob, findShallowest } from './glob.js';
 import { interpolate } from './interpolate.js';
 import { evalPredicateExpr, type PredicateExpr, type EvalContext } from './predicate.js';
 
-export type TakeStrategy = 'self' | 'parent' | 'parent.parent' | { depth: number };
+export type TakeStrategy = 'self' | 'parent' | 'parent.parent' | 'archive-root' | { depth: number };
 
 export interface Pattern {
   kind: 'glob' | 'regex';
@@ -46,6 +46,7 @@ const takeOffset = (take: TakeStrategy): number =>
   take === 'self' ? 0
   : take === 'parent' ? 1
   : take === 'parent.parent' ? 2
+  : take === 'archive-root' ? Number.MAX_SAFE_INTEGER
   : take.depth;
 
 // stripPath: compute the relative path for `path` given the resolved anchor match and strategy.

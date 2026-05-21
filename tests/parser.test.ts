@@ -178,4 +178,27 @@ installers:
 `, 'inline.yaml');
     expect(doc.installers![0]!.unless).toBeUndefined();
   });
+
+  it('parses take: archive-root', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: root, name: Root, path: /game }
+installers:
+  - id: root
+    priority: 23
+    when: !hasFile "**/Subnautica2/**"
+    anchor: "**/*"
+    take: archive-root
+    placeAt: /game
+    modType: root
+`, 'inline.yaml');
+    const inst = doc.installers![0]!;
+    expect(inst.single!.take).toBe('archive-root');
+  });
 });

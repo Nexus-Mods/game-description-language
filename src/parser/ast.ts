@@ -55,7 +55,7 @@ export interface ModTypeNode extends Node {
   path: ValueNode;
 }
 
-export type TakeStrategy = 'self' | 'parent' | 'parent.parent' | { depth: number };
+export type TakeStrategy = 'self' | 'parent' | 'parent.parent' | 'archive-root' | { depth: number };
 
 export interface InstallerNode extends Node {
   kind: 'installer';
