@@ -21,17 +21,27 @@ context:
     default: ${installPath}/SubnauticaZero/Binaries/Win64
 
 modTypes:
-  - { id: pak,           name: Pak Mod,        path: "${paksRoot}" }
-  - { id: logic-mod,     name: LogicMod,       path: "${logicModsRoot}" }
-  - { id: ue4ss-lua,     name: UE4SS Lua Mod,  path: "${ue4ssModsRoot}" }
-  - { id: ue4ss-injector, name: UE4SS Injector, path: "${ue4ssInjectorRoot}" }
+  - { id: pak,            name: Pak Mod,          path: "${paksRoot}" }
+  - { id: logic-mod,      name: LogicMod,         path: "${logicModsRoot}" }
+  - { id: ue4ss-lua,      name: UE4SS Lua Mod,    path: "${ue4ssModsRoot}" }
+  - { id: ue4ss-injector, name: UE4SS Injector,   path: "${ue4ssInjectorRoot}" }
+  - { id: root,           name: Root (game folder), path: "${installPath}" }
 
 installers:
   - id: ue4ss-lua
-    priority: 10
+    priority: 22
     when:    !hasFile "**/Scripts/*.lua"
-    anchor:  "**/Scripts/"
-    take:    parent
+    anchor:  "**/Scripts/*.lua"
+    take:    parent.parent
+    placeAt: "${ue4ssModsRoot}"
+    modType: ue4ss-lua
+
+  - id: ue4ss-lua-enabled
+    priority: 23
+    when:    !hasFile "**/enabled.txt"
+    unless:  !hasFile "**/Scripts/*.lua"
+    anchor:  "**/enabled.txt"
+    take:    parent.parent
     placeAt: "${ue4ssModsRoot}"
     modType: ue4ss-lua
 
@@ -78,6 +88,21 @@ installers:
         take:    parent
         placeAt: "${paksRoot}"
         modType: pak
+
+  - id: root
+    priority: 24
+    when: !any
+      - !hasFile "**/Subnautica2/**"
+      - !hasFile "**/Engine/**"
+      - !hasFile "**/Binaries/**"
+    unless: !any
+      - !hasFile "**/LogicMods/**"
+      - !hasFile "**/Scripts/*.lua"
+      - !hasFile "**/{dwmapi.dll,xinput1_4.dll,ue4ss-settings.ini}"
+    anchor: "**/*"
+    take: archive-root
+    placeAt: "${installPath}"
+    modType: root
 
 discovery:
   version: !hook detectGameVersion
@@ -155,6 +180,38 @@ tests:
       expect:
         matched: ue4ss-injector
         modType: ue4ss-injector
+
+    - name: enabled.txt-only ue4ss mod preserves mod-name in destination
+      archive:
+        - MyLuaMod/enabled.txt
+        - MyLuaMod/data.json
+      expect:
+        matched: ue4ss-lua-enabled
+        modType: ue4ss-lua
+        plan:
+          - ${ue4ssModsRoot}/MyLuaMod/enabled.txt
+          - ${ue4ssModsRoot}/MyLuaMod/data.json
+
+    - name: ue4ss lua with Scripts preserves mod-name in destination
+      archive:
+        - MyLuaMod/Scripts/main.lua
+        - MyLuaMod/Scripts/util.lua
+      expect:
+        matched: ue4ss-lua
+        plan:
+          - ${ue4ssModsRoot}/MyLuaMod/Scripts/main.lua
+          - ${ue4ssModsRoot}/MyLuaMod/Scripts/util.lua
+
+    - name: root installer takes whole game-folder archives as-is
+      archive:
+        - Subnautica2/Content/Paks/foo.pak
+        - Engine/Content/bar.uasset
+      expect:
+        matched: root
+        modType: root
+        plan:
+          - ${installPath}/Subnautica2/Content/Paks/foo.pak
+          - ${installPath}/Engine/Content/bar.uasset
 
 toolbarActions:
   - id: open-ue4ss-settings

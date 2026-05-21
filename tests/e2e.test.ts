@@ -76,6 +76,14 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(testsGenInjector).toContain("it('ue4ss injector — marker in a subfolder; sibling files dropped'");
     expect(testsGenInjector).toContain("it('ue4ss injector — case-insensitive marker match'");
     expect(bundle).toMatch(/['"]ue4ss-injector['"]/);
+
+    const testsGenRoot = readFileSync(join(work, '.gdl-out', 'tests.gen.ts'), 'utf8');
+    expect(testsGenRoot).toContain("it('enabled.txt-only ue4ss mod preserves mod-name in destination'");
+    expect(testsGenRoot).toContain("it('ue4ss lua with Scripts preserves mod-name in destination'");
+    expect(testsGenRoot).toContain("it('root installer takes whole game-folder archives as-is'");
+    expect(bundle).toMatch(/['"]root['"]/);
+    expect(bundle).toMatch(/['"]ue4ss-lua-enabled['"]/);
+    expect(bundle).toMatch(/archive-root/);
   }, 90000);
 });
 
