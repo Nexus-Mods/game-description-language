@@ -8,7 +8,7 @@
   "engines": { "node": ">=22" },
   "bin": { "gdl": "./dist/cli.js" },
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp -r src/templates dist/templates",
+    "build": "tsc -p tsconfig.json && cp -r src/templates dist/templates && cp src/bundler/tsconfig.bundle.json dist/bundler/tsconfig.bundle.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json"
