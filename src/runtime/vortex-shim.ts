@@ -1,4 +1,4 @@
-import type { IExtensionContext, IGame, TestSupportedFn, InstallFn } from 'vortex-api';
+import type { IExtensionContext, IGame, TestSupportedFn, InstallFn, ActionVisibilityFn, ActionRunFn } from 'vortex-api';
 import type { DiscoveryFacts, ResolvedContext, ResolvableValue } from './context-resolver.js';
 import { resolveContext, type ContextSpec } from './context-resolver.js';
 import { interpolate } from './interpolate.js';
@@ -27,6 +27,15 @@ export interface StoreDecl {
   value: string | number;
 }
 
+export interface ToolbarActionDecl {
+  id: string;
+  title: string;
+  priority: number;
+  target:
+    | { kind: 'openFile'; template: string }
+    | { kind: 'openUrl';  template: string };
+}
+
 export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
 
@@ -39,6 +48,7 @@ export class GdlRuntime {
     modTypes: ModTypeDecl[],
     installers: InstallerRule[] = [],
     discovery: { versionHook?: (ctx: DiscoveryFacts) => Promise<string | null> } = {},
+    toolbarActions: ToolbarActionDecl[] = [],
   ) {
     const game: IGame = {
       id: decl.id,
@@ -80,6 +90,10 @@ export class GdlRuntime {
     for (const inst of installers) {
       this.registerInstallerRule(decl.id, inst);
     }
+
+    for (const action of toolbarActions) {
+      this.registerToolbarAction(decl.id, action);
+    }
   }
 
   private registerInstallerRule(gameId: string, rule: InstallerRule): void {
@@ -107,6 +121,45 @@ export class GdlRuntime {
     };
 
     this.api.registerInstaller(rule.id, rule.priority, testSupported, install);
+  }
+
+  private registerToolbarAction(gameId: string, action: ToolbarActionDecl): void {
+    const isThisGameActive: ActionVisibilityFn = () => {
+      try {
+        // Late import to keep this code path inert when vortex-api isn't on disk (e.g., unit tests).
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { selectors } = require('vortex-api') as typeof import('vortex-api');
+        const state = this.api.api.getState();
+        return selectors.activeGameId(state) === gameId;
+      } catch {
+        // If something goes wrong reading state, fail open (show the action).
+        return true;
+      }
+    };
+
+    const run: ActionRunFn = () => {
+      try {
+        const ctx = this.resolvedCtx ?? {};
+        const target = interpolate(action.target.template, ctx);
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { util } = require('vortex-api') as typeof import('vortex-api');
+        void util.opn(target);
+      } catch (err) {
+        // Don't crash Vortex over a misbehaving toolbar action.
+        // eslint-disable-next-line no-console
+        console.error(`gdl toolbar action ${action.id} failed:`, err);
+      }
+    };
+
+    this.api.registerAction(
+      'mod-icons',
+      action.priority,
+      'open-ext',
+      {},
+      action.title,
+      run,
+      isThisGameActive,
+    );
   }
 
   private resolveModTypePath(mt: ModTypeDecl): string {
