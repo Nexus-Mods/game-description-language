@@ -57,19 +57,19 @@ Anything weirder (multiple IDs for one store) can opt into a nested form, but th
 
 ### 3.2 Context
 
-Built-in variables are always present: `store`, `os`, `arch`, `installPath`, `executablePath`, `userDataPath`, `documentsPath`, and `version` when a version-detection hook is declared. The author adds their own under a top-level `context:` block. Each variable is a literal, an interpolated string, a branch tag, or a `!hook` call that returns a value. Resolution runs once at discovery time and the result is a frozen `GameContext` consumed by every later rule.
+Built-in variables are always present: `store`, `os`, `arch`, `installPath`, `executablePath`, `userDataPath`, `documentsPath`, and `version` when a version-detection hook is declared. The author adds their own under a top-level `context:` block. Each variable is a literal, an interpolated string, a `storeBranch` object, or a `{ hook: <id> }` object that returns a value. Resolution runs once at discovery time and the result is a frozen `GameContext` consumed by every later rule.
 
 ### 3.3 Evaluation tags
 
-A small fixed set, registered with the YAML parser:
+A small fixed set of object-form constructs (all written as plain YAML mappings — no `!tags`):
 
-- `!hook <id>` — reference to a typed function in `src/hooks.ts`. The schema declares the expected signature per hook ID.
-- `!storeBranch`, `!osBranch`, `!versionBranch` — keyed-by-fact dispatch with a required `default` arm. Arms can themselves be tags or interpolated strings, so branches compose.
-- `!when <predicate>` — generic gate, with predicate combinators `!any [..]`, `!all [..]`, `!not <p>`. Equality (`==`, `!=`), membership (`in`), and version comparators (`>=`, `<`) are available. The language is deliberately small; anything richer goes through `!hook`.
-- `!hasFile <glob>`, `!hasFiles [...]`, `!matches <regex>` — pattern predicates for installer match blocks and diagnostics.
-- `!path <segments…>` — composes paths from segments with OS-aware separators.
+- `{ hook: <id> }` — reference to a typed function in `src/hooks.ts`. The schema declares the expected signature per hook ID.
+- `storeBranch:`, `osBranch:`, `versionBranch:` — keyed-by-fact dispatch with a required `default` arm. Arms can themselves be nested objects or interpolated strings, so branches compose.
+- `any: [...]` / `all: [...]` / `not: <p>` — boolean predicate combinators. Equality (`==`, `!=`), membership (`in`), and version comparators (`>=`, `<`) are available. The language is deliberately small; anything richer goes through `{ hook: <id> }`.
+- `{ hasFile: "<glob>" }`, `{ hasFiles: [...] }`, `{ matches: "<regex>" }` — pattern predicates for installer match blocks and diagnostics.
+- `{ path: [<segments…>] }` — composes paths from segments with OS-aware separators.
 
-The tag set is open: schema minors can add tags without restructuring the codegen, which is how the expression surface grows in response to real needs (Section 10).
+The expression surface is open: schema minors can add new object forms without restructuring the codegen, which is how it grows in response to real needs (Section 10).
 
 ### 3.4 String interpolation
 
@@ -77,7 +77,7 @@ Inside any string scalar, `${name}` substitutes from the resolved context. The c
 
 ### 3.5 Pattern syntax
 
-Globs are the primary form (`**`, `*`, `?`, `[…]`, `{a,b}`), matched against POSIX-form paths inside an archive's manifest or against the deployed file tree. Regex is available via `!matches`. The same matcher implementation backs every match site — `!hasFile` predicates, installer anchors, route match clauses, diagnostic queries.
+Globs are the primary form (`**`, `*`, `?`, `[…]`, `{a,b}`), matched against POSIX-form paths inside an archive's manifest or against the deployed file tree. Regex is available via `{ matches: "..." }`. The same matcher implementation backs every match site — `{ hasFile: "..." }` predicates, installer anchors, route match clauses, diagnostic queries.
 
 ### 3.6 Installers
 
@@ -100,59 +100,63 @@ stores:
   xbox:  Unknown.Subnautica2
 
 context:
-  paksRoot: !storeBranch
-    xbox:    ${installPath}/Content/Paks/~mods
-    default: ${installPath}/SubnauticaZero/Content/Paks/~mods
+  paksRoot:
+    storeBranch:
+      xbox:    ${installPath}/Content/Paks/~mods
+      default: ${installPath}/SubnauticaZero/Content/Paks/~mods
   logicModsRoot: ${installPath}/SubnauticaZero/Content/Paks/LogicMods
   ue4ssModsRoot: ${installPath}/SubnauticaZero/Binaries/Win64/Mods
 
 modTypes:
-  - { id: pak,        name: Pak Mod,       path: ${paksRoot} }
-  - { id: logic-mod,  name: LogicMod,      path: ${logicModsRoot} }
-  - { id: ue4ss-lua,  name: UE4SS Lua Mod, path: ${ue4ssModsRoot} }
+  - { id: pak,        name: Pak Mod,       path: "${paksRoot}" }
+  - { id: logic-mod,  name: LogicMod,      path: "${logicModsRoot}" }
+  - { id: ue4ss-lua,  name: UE4SS Lua Mod, path: "${ue4ssModsRoot}" }
 
 installers:
   - id: ue4ss-lua
     priority: 10
-    when:    !hasFile "**/Scripts/*.lua"
+    when:    { hasFile: "**/Scripts/*.lua" }
     anchor:  "**/Scripts/"
     take:    parent
-    placeAt: ${ue4ssModsRoot}/${archiveName}
+    placeAt: "${ue4ssModsRoot}/${archiveName}"
     modType: ue4ss-lua
 
   - id: logic-mod
     priority: 20
-    when:    !hasFile "**/LogicMods/**/*.pak"
+    when:    { hasFile: "**/LogicMods/**/*.pak" }
     anchor:  "**/LogicMods/"
     take:    self
-    placeAt: ${logicModsRoot}
+    placeAt: "${logicModsRoot}"
     modType: logic-mod
 
   - id: pak
     priority: 30
-    when:    !hasFile "**/*.pak"
+    when:    { hasFile: "**/*.pak" }
     anchor:  "**/*.pak"
     take:    parent
-    placeAt: ${paksRoot}
+    placeAt: "${paksRoot}"
     modType: pak
 
   - id: composite-mod
     priority: 99
-    when: !all [ !hasFile "**/*.pak", !hasFile "**/Scripts/*.lua" ]
+    when:
+      all:
+        - { hasFile: "**/*.pak" }
+        - { hasFile: "**/Scripts/*.lua" }
     route:
       - match:    "**/Scripts/*.lua"
         anchor:   "**/Scripts/"
         take:     parent
-        placeAt:  ${ue4ssModsRoot}/${archiveName}
+        placeAt:  "${ue4ssModsRoot}/${archiveName}"
         modType:  ue4ss-lua
       - match:    "**/*.pak"
         anchor:   "**/*.pak"
         take:     parent
-        placeAt:  ${paksRoot}
+        placeAt:  "${paksRoot}"
         modType:  pak
 
 discovery:
-  version: !hook detectGameVersion
+  version: { hook: detectGameVersion }
 
 tests:
   corpus: nexus
@@ -182,7 +186,7 @@ nexus:
 
 **Phase 3: Context resolution and predicate type-checking.** The `context:` block is topologically sorted; every `${var}` site is checked against defined names; every branch tag has its required arms and `default:` checked, with all arms producing the same value type. Predicates referencing `version` without a declared version-detection hook fail here.
 
-**Phase 4: Hook resolution.** Every `!hook <id>` reference is resolved against `src/hooks.ts` using the TypeScript compiler API. The schema declares the expected signature per hook ID (for example `detectGameVersion: (ctx: GameContext) => Promise<string | null>`). Missing exports, extra hooks, or signature mismatches are build errors that point at both the YAML reference and the TS declaration.
+**Phase 4: Hook resolution.** Every `{ hook: <id> }` reference is resolved against `src/hooks.ts` using the TypeScript compiler API. The schema declares the expected signature per hook ID (for example `detectGameVersion: (ctx: GameContext) => Promise<string | null>`). Missing exports, extra hooks, or signature mismatches are build errors that point at both the YAML reference and the TS declaration.
 
 **Phase 5: Emission.** Files are written to `.gdl-out/` (git-ignored):
 
@@ -215,7 +219,7 @@ The helper library is the only dependency the generated code has besides `vortex
 
 **Installer engine.** Pure-function core: anchor pattern + `take:` strategy + `placeAt:` template + archive file list → install plan as a list of `{source, destination, type}` triples. The `route:` form is the same engine called once per route. No I/O, no Vortex calls — which makes it the natural target for the inline `tests:` fixtures.
 
-**Predicate primitives.** Semver compare, equality, membership. Boolean combinators (`!any`/`!all`/`!not`) are *not* helpers — the codegen emits them inline as `||` / `&&` / `!` so the stack frame stays at the rule the author wrote.
+**Predicate primitives.** Semver compare, equality, membership. Boolean combinators (`any:`/`all:`/`not:`) are *not* helpers — the codegen emits them inline as `||` / `&&` / `!` so the stack frame stays at the rule the author wrote.
 
 **Vortex API shim.** The most strategically important piece. Presents a stable typed surface (`registerGame`, `registerInstaller`, `registerModType`, `registerTool`, `registerLoadOrder`, `addPrelaunchHook`, `addDiagnostic`, mediated file reads, deployed-tree queries, prelaunch-write commands) and translates each call to the corresponding `vortex-api` call. When `vortex-api` changes shape, the change is absorbed in the shim and never reaches generated code.
 
@@ -324,7 +328,7 @@ Stated explicitly so they do not creep in during implementation.
 - **Not the Worker-sandbox adaptor design from `GameAdaptorDesign.md`.** That is a future Vortex change. This project is tooling on top of today's API.
 - **Not a runtime YAML interpreter.** No YAML reaches the bundle.
 - **Not for general-purpose extensions.** Theming, utility panels, integrations stay on the regular extension surface. The GDL handles game support only.
-- **Minimal expression surface in v1.** The predicate language starts small (equality, version comparators, membership, boolean combinators). More complex constructs — string ops, arithmetic, computed paths, lookup tables — are added in later schema minors when a concrete use case forces the question. The growth path is more typed YAML tags with declared signatures, not embedded code in strings. `!hook` remains the escape hatch for anything the schema does not yet express. The codegen's tag set is open by design: adding a tag does not require restructuring the build.
+- **Minimal expression surface in v1.** The predicate language starts small (equality, version comparators, membership, boolean combinators). More complex constructs — string ops, arithmetic, computed paths, lookup tables — are added in later schema minors when a concrete use case forces the question. The growth path is more typed object-form constructs with declared schemas, not embedded code in strings. `{ hook: <id> }` remains the escape hatch for anything the schema does not yet express. The expression surface is open by design: adding a new object form does not require restructuring the build.
 - **No automatic migration of existing extensions** in v1.
 - **No Nexus mod-page management.** The author creates the mod page once and records its ID in `game.yaml#nexus.modId`. `gdl publish` uploads versions; it does not create pages.
 - **No web UI** for browsing or editing extensions. JSON Schema plus IDE integration is enough.
@@ -345,8 +349,8 @@ Re-authoring subnautica2 — UE5/UE4SS with three mod types and multiple stores 
 - **Extension repo** — a single-game repo containing `game.yaml` and optional `src/hooks.ts`, pinned to a submodule commit.
 - **Codegen** — `gdl build`; the build-time process that turns YAML into TypeScript.
 - **Helper library** — the small runtime that generated code calls into for matching, interpolation, plan construction, and Vortex registration.
-- **Hook** — a typed TypeScript function in `src/hooks.ts` referenced from YAML via `!hook <id>`.
-- **Context** — the resolved, frozen object of named values that string interpolation, predicates, and branch tags read from at install or discovery time.
-- **Tag** — a YAML type marker (`!hook`, `!storeBranch`, `!hasFile`, …) the GDL parser knows how to lower into code.
+- **Hook** — a typed TypeScript function in `src/hooks.ts` referenced from YAML via `{ hook: <id> }`.
+- **Context** — the resolved, frozen object of named values that string interpolation, predicates, and branch objects read from at install or discovery time.
+- **Object form** — the GDL syntax for computed values and predicates: plain YAML mappings such as `{ hasFile: "..." }`, `{ hook: <id> }`, `storeBranch: { ... }`. Replaces the earlier tag-form syntax (`!hasFile`, `!hook`, etc.) which is no longer accepted by the parser.
 - **Corpus** — the set of archives a test run exercises an extension against, optionally pulled from Nexus.
 - **Shim** — the small typed surface between generated code and `vortex-api`; absorbs upstream churn.
