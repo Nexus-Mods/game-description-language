@@ -21,3 +21,17 @@ describe('runBundler', () => {
     expect(bundle).toContain('vortex-api');   // externalised reference present
   }, 30000);
 });
+
+describe('runBundler — extension-repo cwd (no local node_modules)', () => {
+  it('resolves ts-loader from the GDL submodule, not from cwd', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gdl-bundle-extrepo-'));
+    await mkdir(join(dir, '.gdl-out'), { recursive: true });
+    writeFileSync(
+      join(dir, '.gdl-out', 'extension.ts'),
+      `import { log } from 'vortex-api';\nexport default function main() { log('info', 'x'); return true; }\n`,
+    );
+    // Note: no node_modules in `dir`. The bundler must find ts-loader in the GDL repo's node_modules.
+    await runBundler(dir);
+    expect(existsSync(join(dir, 'dist', 'extension.js'))).toBe(true);
+  }, 30000);
+});

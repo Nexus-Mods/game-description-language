@@ -4,6 +4,7 @@ import type { Configuration } from 'webpack';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bundleTsConfig = resolve(here, 'tsconfig.bundle.json');
+const gdlNodeModules = resolve(here, '..', '..', 'node_modules');
 
 export const buildConfig = (cwd: string): Configuration => ({
   mode: 'production',
@@ -14,6 +15,9 @@ export const buildConfig = (cwd: string): Configuration => ({
     path: join(cwd, 'dist'),
     filename: 'extension.js',
     libraryTarget: 'commonjs2',
+  },
+  resolveLoader: {
+    modules: [gdlNodeModules, 'node_modules'],
   },
   resolve: {
     extensions: ['.ts', '.js'],
