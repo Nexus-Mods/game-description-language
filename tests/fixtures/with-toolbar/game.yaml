@@ -1,0 +1,18 @@
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+context:
+  modsRoot: ${installPath}/Mods
+toolbarActions:
+  - id: open-settings
+    title: Open Settings
+    priority: 200
+    target: !openFile "${modsRoot}/settings.ini"
+
+  - id: open-website
+    title: Open Website
+    priority: 201
+    target: !openUrl https://example.com/${gameId}

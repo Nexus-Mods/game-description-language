@@ -96,6 +96,17 @@ describe('parseYaml', () => {
     expect(c.expect!.plan).toEqual(['${modsRoot}/CoolPak.pak', '${modsRoot}/Readme.md']);
   });
 
+  it('parses toolbarActions with !openFile and !openUrl', () => {
+    const doc = parseYaml(fixture('with-toolbar/game.yaml'), 'with-toolbar/game.yaml');
+    expect(doc.toolbarActions).toHaveLength(2);
+    const [a, b] = doc.toolbarActions!;
+    expect(a!.id).toBe('open-settings');
+    expect(a!.title).toBe('Open Settings');
+    expect(a!.priority).toBe(200);
+    expect(a!.target).toEqual({ kind: 'openFile', template: '${modsRoot}/settings.ini' });
+    expect(b!.target).toEqual({ kind: 'openUrl', template: 'https://example.com/${gameId}' });
+  });
+
   it('parses nexus block with modId, fileGroupId, displayName', () => {
     const doc = parseYaml(`
 gdl: 1

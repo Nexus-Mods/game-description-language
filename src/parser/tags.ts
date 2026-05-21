@@ -33,4 +33,11 @@ export const customTags: Tags = [
 
   // Hook reference — scalar carrying the hook id.
   { tag: HOOK_TAG, resolve: (value: unknown) => value },
+
+  // Toolbar action targets — scalars carrying a file path or URL template.
+  { tag: '!openFile', resolve: (value: unknown) => value },
+  { tag: '!openUrl',  resolve: (value: unknown) => value },
 ];
+
+export const TOOLBAR_ACTION_TARGET_TAG_NAMES: ReadonlySet<string> =
+  new Set(['!openFile', '!openUrl']);

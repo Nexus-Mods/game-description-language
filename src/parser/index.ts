@@ -4,6 +4,7 @@ import type {
   InstallerNode, SingleInstallerForm, RouteEntry, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode, NexusNode,
+  ToolbarActionNode, ToolbarActionTarget,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -279,6 +280,20 @@ const parseTestsBlock = (node: YamlNode, file: string, source: string): TestsNod
   };
 };
 
+const parseToolbarActionTarget = (node: YamlNode, file: string, source: string): ToolbarActionTarget => {
+  const span = spanOf(file, source, node);
+  if (isScalar(node) && typeof node.value === 'string') {
+    const tag = typeof node.tag === 'string' ? node.tag : '';
+    if (tag === '!openFile') return { kind: 'openFile', template: node.value };
+    if (tag === '!openUrl')  return { kind: 'openUrl',  template: node.value };
+  }
+  throw new BuildErrors([{
+    code: 'GDL140',
+    message: 'toolbar action `target:` must be `!openFile <path>` or `!openUrl <url>`',
+    span,
+  }]);
+};
+
 export const parseYaml = (source: string, file: string): DocumentNode => {
   const doc: Document = parseDocument(source, { customTags, keepSourceTokens: true });
   const errors: BuildError[] = doc.errors.map((e) => {
@@ -500,17 +515,41 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     };
   }
 
+  const toolbarYaml = root.get('toolbarActions', true);
+  let toolbarActions: ToolbarActionNode[] | undefined;
+  if (isSeq(toolbarYaml)) {
+    toolbarActions = [];
+    for (const entry of toolbarYaml.items) {
+      if (!isMap(entry)) {
+        throw new BuildErrors([{
+          code: 'GDL141',
+          message: 'toolbarActions entries must be mappings',
+          span: spanOf(file, source, entry as YamlNode),
+        }]);
+      }
+      toolbarActions.push({
+        kind: 'toolbarAction',
+        id:       String(entry.get('id') ?? ''),
+        title:    String(entry.get('title') ?? ''),
+        priority: Number(entry.get('priority') ?? 100),
+        target:   parseToolbarActionTarget(entry.get('target', true) as YamlNode, file, source),
+        span:     spanOf(file, source, entry),
+      });
+    }
+  }
+
   return {
     kind: 'document',
     gdl,
     game,
-    ...(stores     !== undefined && { stores }),
-    ...(context    !== undefined && { context }),
-    ...(modTypes   !== undefined && { modTypes }),
-    ...(installers !== undefined && { installers }),
-    ...(discovery  !== undefined && { discovery }),
-    ...(tests      !== undefined && { tests }),
-    ...(nexus      !== undefined && { nexus }),
+    ...(stores          !== undefined && { stores }),
+    ...(context         !== undefined && { context }),
+    ...(modTypes        !== undefined && { modTypes }),
+    ...(installers      !== undefined && { installers }),
+    ...(discovery       !== undefined && { discovery }),
+    ...(tests           !== undefined && { tests }),
+    ...(nexus           !== undefined && { nexus }),
+    ...(toolbarActions  !== undefined && { toolbarActions }),
     span: spanOf(file, source, root),
   };
 };
