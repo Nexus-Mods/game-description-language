@@ -15,6 +15,12 @@ export const HOOK_CATALOG: HookCatalogEntry[] = [
     parameterTypes: ['GameContext'],
     returnType: 'Promise<string | null>',
   },
+  {
+    id: 'didDeploy',
+    expectedSignature: '(ctx: DidDeployContext) => Promise<void>',
+    parameterTypes: ['DidDeployContext'],
+    returnType: 'Promise<void>',
+  },
 ];
 
 export const findHook = (id: string): HookCatalogEntry | undefined =>

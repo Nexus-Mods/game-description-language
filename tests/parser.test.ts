@@ -221,4 +221,21 @@ setup:
     expect(doc.setup).toBeDefined();
     expect(doc.setup!.ensureDirs).toEqual(['${paksRoot}', '${logicRoot}']);
   });
+
+  it('parses events.did-deploy with !hook reference', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+events:
+  did-deploy: !hook regenerateMetadata
+`, 'inline.yaml');
+    expect(doc.events).toBeDefined();
+    expect(doc.events!.didDeploy).toBeDefined();
+    expect(doc.events!.didDeploy!.kind).toBe('hookRef');
+    expect(doc.events!.didDeploy!.hookId).toBe('regenerateMetadata');
+  });
 });

@@ -4,7 +4,7 @@ import type {
   InstallerNode, SingleInstallerForm, RouteEntry, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode, NexusNode,
-  ToolbarActionNode, ToolbarActionTarget, SetupNode,
+  ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -566,6 +566,33 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     };
   }
 
+  const eventsYaml = root.get('events', true);
+  let events: EventsNode | undefined;
+  if (isMap(eventsYaml)) {
+    const didDeployYaml = eventsYaml.get('did-deploy', true);
+    let didDeploy: HookRefNode | undefined;
+    if (didDeployYaml !== undefined && didDeployYaml !== null) {
+      if (isScalar(didDeployYaml) && typeof didDeployYaml.tag === 'string' && didDeployYaml.tag === '!hook' && typeof didDeployYaml.value === 'string') {
+        didDeploy = {
+          kind: 'hookRef',
+          hookId: didDeployYaml.value,
+          span: spanOf(file, source, didDeployYaml),
+        };
+      } else {
+        throw new BuildErrors([{
+          code: 'GDL151',
+          message: 'events.did-deploy must be a `!hook <name>` reference',
+          span: spanOf(file, source, didDeployYaml as YamlNode),
+        }]);
+      }
+    }
+    events = {
+      kind: 'events',
+      ...(didDeploy !== undefined && { didDeploy }),
+      span: spanOf(file, source, eventsYaml),
+    };
+  }
+
   return {
     kind: 'document',
     gdl,
@@ -579,6 +606,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(nexus           !== undefined && { nexus }),
     ...(toolbarActions  !== undefined && { toolbarActions }),
     ...(setup           !== undefined && { setup }),
+    ...(events          !== undefined && { events }),
     span: spanOf(file, source, root),
   };
 };
