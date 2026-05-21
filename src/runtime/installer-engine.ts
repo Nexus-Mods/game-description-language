@@ -28,6 +28,7 @@ export interface InstallerRule {
   priority: number;
   when: PredicateExpr;
   unless?: PredicateExpr;
+  scope?: { stores?: string[] };
   single?: SingleForm;
   route?: RouteEntry[];
   modType?: string;          // single only

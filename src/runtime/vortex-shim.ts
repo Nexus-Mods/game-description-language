@@ -48,8 +48,13 @@ export interface EventHooks {
 
 export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
+  private discoveredStore: string | undefined;
 
   constructor(private readonly api: IExtensionContext) {}
+
+  setDiscoveredStore(store: string | undefined): void {
+    this.discoveredStore = store;
+  }
 
   registerGame(
     decl: GameDecl,
@@ -129,6 +134,11 @@ export class GdlRuntime {
   private registerInstallerRule(gameId: string, rule: InstallerRule): void {
     const testSupported: TestSupportedFn = async (files, gid) => {
       if (gid !== gameId) return { supported: false };
+      if (rule.scope?.stores && rule.scope.stores.length > 0) {
+        if (!this.discoveredStore || !rule.scope.stores.includes(this.discoveredStore)) {
+          return { supported: false };
+        }
+      }
       const ctx = {
         archivePaths: files,
         vars: this.resolvedCtx ?? {},
@@ -151,6 +161,11 @@ export class GdlRuntime {
     };
 
     this.api.registerInstaller(rule.id, rule.priority, testSupported, install);
+  }
+
+  // Test-only seam.
+  registerInstallerRulePublic(gameId: string, rule: InstallerRule): void {
+    this.registerInstallerRule(gameId, rule);
   }
 
   private registerToolbarAction(gameId: string, action: ToolbarActionDecl): void {
@@ -213,6 +228,7 @@ export class GdlRuntime {
     try {
       const found = await GameStoreHelper.findByAppId(appIds);
       if (!found) return null;
+      this.discoveredStore = found.gameStoreId;
       return {
         store: found.gameStoreId,
         os: process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux',
