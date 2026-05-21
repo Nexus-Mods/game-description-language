@@ -201,4 +201,24 @@ installers:
     const inst = doc.installers![0]!;
     expect(inst.single!.take).toBe('archive-root');
   });
+
+  it('parses setup.ensureDirs', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+context:
+  paksRoot:  \${installPath}/Mods/Paks
+  logicRoot: \${installPath}/Mods/Logic
+setup:
+  ensureDirs:
+    - \${paksRoot}
+    - \${logicRoot}
+`, 'inline.yaml');
+    expect(doc.setup).toBeDefined();
+    expect(doc.setup!.ensureDirs).toEqual(['${paksRoot}', '${logicRoot}']);
+  });
 });

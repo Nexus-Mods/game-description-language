@@ -16,6 +16,8 @@ export interface DocumentNode extends Node {
   tests?: TestsNode;
   nexus?: NexusNode;
   toolbarActions?: ToolbarActionNode[];
+  setup?: SetupNode;
+  events?: EventsNode;
 }
 
 export interface GameNode extends Node {
@@ -163,4 +165,16 @@ export interface ToolbarActionNode extends Node {
   title: string;
   priority: number;
   target: ToolbarActionTarget;
+}
+
+// Declarative setup-hook: tell Vortex to ensure these directories exist before the game is moddable.
+export interface SetupNode extends Node {
+  kind: 'setup';
+  ensureDirs: string[];   // path templates, interpolated against context
+}
+
+// Wired in Task 2. Stub now so DocumentNode compiles.
+export interface EventsNode extends Node {
+  kind: 'events';
+  didDeploy?: HookRefNode;
 }

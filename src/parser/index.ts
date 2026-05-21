@@ -4,7 +4,7 @@ import type {
   InstallerNode, SingleInstallerForm, RouteEntry, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode, NexusNode,
-  ToolbarActionNode, ToolbarActionTarget,
+  ToolbarActionNode, ToolbarActionTarget, SetupNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -541,6 +541,31 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }
   }
 
+  const setupYaml = root.get('setup', true);
+  let setup: SetupNode | undefined;
+  if (isMap(setupYaml)) {
+    const ensureDirsYaml = setupYaml.get('ensureDirs', true);
+    const dirs: string[] = [];
+    if (isSeq(ensureDirsYaml)) {
+      for (const item of ensureDirsYaml.items) {
+        if (isScalar(item) && typeof item.value === 'string') {
+          dirs.push(item.value);
+        } else {
+          throw new BuildErrors([{
+            code: 'GDL150',
+            message: 'setup.ensureDirs entries must be strings',
+            span: spanOf(file, source, item as YamlNode),
+          }]);
+        }
+      }
+    }
+    setup = {
+      kind: 'setup',
+      ensureDirs: dirs,
+      span: spanOf(file, source, setupYaml),
+    };
+  }
+
   return {
     kind: 'document',
     gdl,
@@ -553,6 +578,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(tests           !== undefined && { tests }),
     ...(nexus           !== undefined && { nexus }),
     ...(toolbarActions  !== undefined && { toolbarActions }),
+    ...(setup           !== undefined && { setup }),
     span: spanOf(file, source, root),
   };
 };
