@@ -15,6 +15,7 @@ export interface DocumentNode extends Node {
   discovery?: DiscoveryNode;
   tests?: TestsNode;
   nexus?: NexusNode;
+  toolbarActions?: ToolbarActionNode[];
 }
 
 export interface GameNode extends Node {
@@ -148,4 +149,17 @@ export interface NexusNode extends Node {
   modId: number;
   fileGroupId: number;
   displayName: string;
+}
+
+// Toolbar action — declarative UI for opening a file or URL from Vortex's mod-icons toolbar.
+export type ToolbarActionTarget =
+  | { kind: 'openFile'; template: string }
+  | { kind: 'openUrl';  template: string };
+
+export interface ToolbarActionNode extends Node {
+  kind: 'toolbarAction';
+  id: string;
+  title: string;
+  priority: number;
+  target: ToolbarActionTarget;
 }
