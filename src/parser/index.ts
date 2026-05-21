@@ -38,6 +38,11 @@ const tagToKind = (tag: BranchTagName): 'storeBranch' | 'osBranch' | 'versionBra
   : tag === '!osBranch' ? 'osBranch'
   : 'versionBranch';
 
+const keyToKind = (key: string): 'storeBranch' | 'osBranch' | 'versionBranch' =>
+  key === 'storeBranch' ? 'storeBranch'
+  : key === 'osBranch' ? 'osBranch'
+  : 'versionBranch';
+
 const parseHookRef = (node: YamlNode | null | undefined, file: string, source: string): HookRefNode => {
   if (isScalar(node) && (node as { tag?: unknown }).tag === HOOK_TAG && typeof node.value === 'string') {
     return { kind: 'hookRef', hookId: node.value, span: spanOf(file, source, node) };
@@ -47,6 +52,32 @@ const parseHookRef = (node: YamlNode | null | undefined, file: string, source: s
     message: 'expected `!hook <id>` reference',
     span: spanOf(file, source, node ?? null),
   }]);
+};
+
+const parseBranchArms = (
+  inner: { items: unknown[] },
+  label: string,
+  span: YamlSpan,
+  file: string,
+  source: string,
+): { arms: Record<string, ValueNode>; default: ValueNode } => {
+  const arms: Record<string, ValueNode> = {};
+  let defaultArm: ValueNode | undefined;
+  for (const pair of inner.items) {
+    if (!isPair(pair)) continue;
+    const armKey = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+    const armValue = parseValueNode(pair.value as YamlNode, file, source);
+    if (armKey === 'default') defaultArm = armValue;
+    else arms[armKey] = armValue;
+  }
+  if (!defaultArm) {
+    throw new BuildErrors([{
+      code: 'GDL022',
+      message: `\`${label}\` requires a \`default:\` arm`,
+      span,
+    }]);
+  }
+  return { arms, default: defaultArm };
 };
 
 const parseValueNode = (node: YamlNode | null | undefined, file: string, source: string): ValueNode => {
@@ -60,23 +91,33 @@ const parseValueNode = (node: YamlNode | null | undefined, file: string, source:
   // Branch tag: tagged YAMLMap with one of the known branch tag names.
   if (isMap(node) && typeof node.tag === 'string' && BRANCH_TAG_NAMES.has(node.tag as BranchTagName)) {
     const tag = node.tag as BranchTagName;
-    const arms: Record<string, ValueNode> = {};
-    let defaultArm: ValueNode | undefined;
-    for (const pair of node.items) {
-      if (!isPair(pair)) continue;
-      const armKey = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
-      const armValue = parseValueNode(pair.value as YamlNode, file, source);
-      if (armKey === 'default') defaultArm = armValue;
-      else arms[armKey] = armValue;
-    }
-    if (!defaultArm) {
-      throw new BuildErrors([{
-        code: 'GDL022',
-        message: `\`${tag}\` requires a \`default:\` arm`,
-        span,
-      }]);
-    }
+    const { arms, default: defaultArm } = parseBranchArms(node, tag, span, file, source);
     return { kind: tagToKind(tag), arms, default: defaultArm, span };
+  }
+
+  // Object form for branches: { storeBranch | osBranch | versionBranch: { arm: value, ... } }
+  if (isMap(node) && (typeof node.tag !== 'string' || node.tag === '')) {
+    const keys: string[] = [];
+    for (const item of node.items) {
+      if (isScalar(item.key) && typeof item.key.value === 'string') {
+        keys.push(item.key.value);
+      }
+    }
+    const BRANCH_KEYS = ['storeBranch', 'osBranch', 'versionBranch'];
+    const matched = keys.filter(k => BRANCH_KEYS.includes(k));
+    if (matched.length === 1 && keys.length === 1) {
+      const key = matched[0]!;
+      const inner = node.get(key, true);
+      if (!isMap(inner)) {
+        throw new BuildErrors([{
+          code: 'GDL171',
+          message: `${key} must be a mapping of arm names to values`,
+          span,
+        }]);
+      }
+      const { arms, default: defaultArm } = parseBranchArms(inner, key, span, file, source);
+      return { kind: keyToKind(key), arms, default: defaultArm, span };
+    }
   }
 
   if (isScalar(node)) {

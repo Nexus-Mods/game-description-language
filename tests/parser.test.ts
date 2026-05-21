@@ -386,4 +386,42 @@ installers:
     modType: pak
 `, 'inline.yaml')).toThrow();
   });
+
+  it('parses object-form { storeBranch: {...} } in context', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+context:
+  archRoot:
+    storeBranch:
+      xbox: /xbox/path
+      default: /default/path
+`, 'inline.yaml');
+    const binding = doc.context!.bindings.find(b => b.name === 'archRoot')!;
+    expect(binding.value.kind).toBe('storeBranch');
+  });
+
+  it('parses object-form { osBranch: {...} } in context', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+context:
+  modRoot:
+    osBranch:
+      windows: /win
+      macos: /mac
+      linux: /lin
+      default: /lin
+`, 'inline.yaml');
+    const binding = doc.context!.bindings.find(b => b.name === 'modRoot')!;
+    expect(binding.value.kind).toBe('osBranch');
+  });
 });
