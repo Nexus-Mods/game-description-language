@@ -129,10 +129,25 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     .map(a => `      ${renderToolbarAction(a)}`)
     .join(',\n');
 
+  const setupDirsLines = (doc.setup?.ensureDirs ?? [])
+    .map(d => `      ${sq(d)}`)
+    .join(',\n');
+
+  const didDeployRef = doc.events?.didDeploy?.hookId;
+  const eventHooksBody = didDeployRef
+    ? `      didDeploy: ${didDeployRef},`
+    : '';
+
   const hookIds = new Set<string>();
   if (doc.discovery?.version) hookIds.add(doc.discovery.version.hookId);
   const hookImports = hookIds.size
     ? `import * as hooks from '../src/hooks.js';`
+    : '';
+
+  const eventHookImports: string[] = [];
+  if (didDeployRef) eventHookImports.push(didDeployRef);
+  const eventHooksImportLine = eventHookImports.length > 0
+    ? `import { ${eventHookImports.join(', ')} } from '../hooks.js';`
     : '';
 
   const versionHook = doc.discovery?.version
@@ -160,6 +175,7 @@ import { GdlRuntime } from '@gdl/runtime';
 import type { IExtensionContext } from 'vortex-api';
 import { rules } from './installers.gen.js';
 ${hookImports}
+${eventHooksImportLine}
 export default function main(api: IExtensionContext): boolean {
   const runtime = new GdlRuntime(api);
   runtime.registerGame(
@@ -189,6 +205,12 @@ ${modTypes}
     [
 ${toolbarActions}
     ],
+    [
+${setupDirsLines}
+    ],
+    {
+${eventHooksBody}
+    },
   );
   return true;
 }

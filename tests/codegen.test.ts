@@ -216,6 +216,62 @@ installers:
   });
 });
 
+describe('emit setup + events', () => {
+  it('emits setupDirs array when setup.ensureDirs is present', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+context:
+  paksRoot: \${installPath}/Mods/Paks
+setup:
+  ensureDirs:
+    - \${paksRoot}
+    - \${installPath}/Mods/Logic
+`, 'tiny.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path === 'extension.ts')!;
+    expect(ext.contents).toContain("'${paksRoot}'");
+    expect(ext.contents).toContain("'${installPath}/Mods/Logic'");
+  });
+
+  it('emits eventHooks.didDeploy as a reference to the imported hook', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+events:
+  did-deploy: !hook regenerateMetadata
+`, 'tiny.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path === 'extension.ts')!;
+    expect(ext.contents).toMatch(/import\s+\{[^}]*regenerateMetadata[^}]*\}\s+from\s+['"]\.\.\/hooks/);
+    expect(ext.contents).toMatch(/didDeploy:\s*regenerateMetadata/);
+  });
+
+  it('emits empty setupDirs and empty eventHooks when neither block is present', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+`, 'tiny.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path === 'extension.ts')!;
+    // Should still build cleanly with empty 8th/9th args
+    expect(ext.contents).toMatch(/\[\s*\]/);   // empty array somewhere (setupDirs)
+    expect(ext.contents).toMatch(/\{\s*\}/);   // empty object somewhere (eventHooks)
+  });
+});
+
 describe('writeEmittedFiles', () => {
   it('writes files to .gdl-out under the target dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-emit-'));
