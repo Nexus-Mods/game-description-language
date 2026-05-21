@@ -108,7 +108,14 @@ export class GdlRuntime {
         mt.id,
         50,
         (gameId) => gameId === decl.id,
-        () => this.resolveModTypePath(mt),
+        (game) => {
+          const gamePath = (game as { gamePath?: string } | null)?.gamePath;
+          const ctx = {
+            ...this.resolvedCtx ?? {},
+            ...(gamePath !== undefined && { installPath: gamePath }),
+          };
+          return this.resolveModTypePath(mt, ctx as ResolvedContext);
+        },
         async () => true,
         { name: mt.name },
       );
@@ -168,6 +175,30 @@ export class GdlRuntime {
     this.registerInstallerRule(gameId, rule);
   }
 
+  // Test-only seam.
+  setResolvedCtxForTesting(ctx: Record<string, string>): void {
+    this.resolvedCtx = ctx;
+  }
+
+  // Test-only seam: register a single mod type with a plain string template.
+  registerModTypePublic(id: string, name: string, pathTemplate: string): void {
+    this.api.registerModType(
+      id,
+      100,
+      () => true,
+      (game) => {
+        const gamePath = (game as { gamePath?: string } | null)?.gamePath;
+        const ctx = {
+          ...this.resolvedCtx ?? {},
+          ...(gamePath !== undefined && { installPath: gamePath }),
+        };
+        return interpolate(pathTemplate, ctx);
+      },
+      async () => true,
+      { name },
+    );
+  }
+
   private registerToolbarAction(gameId: string, action: ToolbarActionDecl): void {
     const isThisGameActive: ActionVisibilityFn = () => {
       try {
@@ -207,18 +238,17 @@ export class GdlRuntime {
     );
   }
 
-  private resolveModTypePath(mt: ModTypeDecl): string {
-    if (!this.resolvedCtx) return '';
+  private resolveModTypePath(mt: ModTypeDecl, ctx: ResolvedContext = this.resolvedCtx ?? {}): string {
     if (mt.path.kind === 'literal') return String(mt.path.raw);
     if (mt.path.kind === 'interpolated') {
-      return interpolate(mt.path.template, this.resolvedCtx);
+      return interpolate(mt.path.template, ctx);
     }
     // Branch value: dispatch then recursively resolve the chosen arm against ctx.
-    const arm = resolveBranch(mt.path, this.resolvedCtx as Record<string, string>) as ResolvableValue;
+    const arm = resolveBranch(mt.path, ctx as Record<string, string>) as ResolvableValue;
     if (arm.kind === 'literal') return String(arm.raw);
-    if (arm.kind === 'interpolated') return interpolate(arm.template, this.resolvedCtx);
+    if (arm.kind === 'interpolated') return interpolate(arm.template, ctx);
     // Nested branches are uncommon for modType paths but supported for symmetry.
-    return String(resolveBranch(arm, this.resolvedCtx as Record<string, string>));
+    return String(resolveBranch(arm, ctx as Record<string, string>));
   }
 
   private async discover(stores: StoreDecl[]): Promise<DiscoveryFacts | null> {

@@ -85,3 +85,41 @@ describe('GdlRuntime — installer scope.stores filtering', () => {
     expect(result).toMatchObject({ supported: true });
   });
 });
+
+describe('GdlRuntime — lazy modType getPath', () => {
+  it('re-interpolates the modType path with the current game.gamePath', () => {
+    const registerModType = vi.fn();
+    const ctx = {
+      registerGame: vi.fn(),
+      registerModType,
+      registerInstaller: vi.fn(),
+      registerAction: vi.fn(),
+      api: { getState: () => ({}), events: { on: vi.fn() } },
+    } as unknown as IExtensionContext;
+    const runtime = new GdlRuntime(ctx);
+    runtime.setResolvedCtxForTesting({ installPath: '/initial' });
+    runtime.registerModTypePublic('pak', 'Paks (~mods)', '${installPath}/Mods/Paks');
+
+    const getPath = registerModType.mock.calls[0]![3];
+
+    expect(getPath({ gamePath: '/initial' })).toBe('/initial/Mods/Paks');
+    expect(getPath({ gamePath: '/relocated' })).toBe('/relocated/Mods/Paks');
+  });
+
+  it('falls back to resolvedCtx.installPath when game.gamePath is undefined', () => {
+    const registerModType = vi.fn();
+    const ctx = {
+      registerGame: vi.fn(),
+      registerModType,
+      registerInstaller: vi.fn(),
+      registerAction: vi.fn(),
+      api: { getState: () => ({}), events: { on: vi.fn() } },
+    } as unknown as IExtensionContext;
+    const runtime = new GdlRuntime(ctx);
+    runtime.setResolvedCtxForTesting({ installPath: '/fallback' });
+    runtime.registerModTypePublic('pak', 'Paks (~mods)', '${installPath}/Mods/Paks');
+
+    const getPath = registerModType.mock.calls[0]![3];
+    expect(getPath({})).toBe('/fallback/Mods/Paks');
+  });
+});
