@@ -49,6 +49,13 @@ declare module 'vortex-api' {
     gameId: string,
   ) => Promise<IInstallResult>;
 
+  // Visibility predicate runs every render frame; return false to hide.
+  export type ActionVisibilityFn = (instanceIds?: string[]) => boolean;
+
+  // Click handler. Vortex passes instanceIds when the action is bound to a list row;
+  // for the mod-icons toolbar the array is empty.
+  export type ActionRunFn = (instanceIds?: string[]) => void;
+
   export interface IExtensionContext {
     registerGame: (game: IGame) => void;
     registerModType: (
@@ -65,6 +72,18 @@ declare module 'vortex-api' {
       testSupported: TestSupportedFn,
       install: InstallFn,
     ) => void;
+    registerAction: (
+      group: string,
+      position: number,
+      iconOrComponent: string,
+      options: Record<string, unknown>,
+      titleOrProps: string,
+      action: ActionRunFn,
+      condition?: ActionVisibilityFn,
+    ) => void;
+    api: {
+      getState: () => unknown;
+    };
   }
 
   export interface IFoundGame {
@@ -77,4 +96,12 @@ declare module 'vortex-api' {
   };
 
   export const log: (level: string, message: string, meta?: unknown) => void;
+
+  export const util: {
+    opn: (target: string) => Promise<void>;
+  };
+
+  export const selectors: {
+    activeGameId: (state: unknown) => string | undefined;
+  };
 }
