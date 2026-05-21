@@ -70,6 +70,17 @@ This writes `game.yaml`, `package.json`, `vitest.config.ts`, and a CI workflow. 
 
 The `game:` block names the game and its required files. The `stores:` block lists store ids (steam, epic, xbox, gog) that Vortex's discovery should look up. At runtime the shim calls `GameStoreHelper.findByAppId([id1, id2, ...])` with every declared id in one call, letting Vortex pick the matching install.
 
+The optional `game.nexusDomain` field carries the game's Nexus URL slug (e.g., `subnautica2`, `skyrimspecialedition`). It distinct from `game.id` (the internal Vortex id) and `game.name` (the display name). The shim attaches it to `IGame.details.nexusPageId` so Vortex can resolve Nexus mod-page URLs and metadata lookups.
+
+```yaml
+game:
+  id: subnautica2
+  name: Subnautica 2
+  executable: Subnautica2.exe
+  requiredFiles: [Subnautica2.exe]
+  nexusDomain: subnautica2
+```
+
 ### Context bindings
 
 The `context:` block defines path templates and values that other blocks reference via `${name}`. Branch on the discovered store, OS, or version:

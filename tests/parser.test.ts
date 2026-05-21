@@ -494,6 +494,31 @@ toolbarActions:
     });
   });
 
+  it('parses game.nexusDomain when present', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+  nexusDomain: subnautica2
+`, 'inline.yaml');
+    expect(doc.game.nexusDomain).toBe('subnautica2');
+  });
+
+  it('leaves game.nexusDomain undefined when omitted', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+`, 'inline.yaml');
+    expect(doc.game.nexusDomain).toBeUndefined();
+  });
+
   it('rejects tag-form YAML (tags no longer supported)', () => {
     expect(() => parseYaml(`
 gdl: 1

@@ -324,6 +324,31 @@ installers:
   });
 });
 
+describe('emit game.nexusDomain', () => {
+  it('emits nexusDomain in the GameDecl when present', () => {
+    const yaml = `
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+  nexusDomain: subnautica2
+`;
+    const doc = parseYaml(yaml, 'tiny.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path === 'extension.ts')!;
+    expect(ext.contents).toMatch(/nexusDomain:\s*'subnautica2'/);
+  });
+
+  it('omits nexusDomain when not set', () => {
+    const doc = parseYaml(TINY, 'tiny.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path === 'extension.ts')!;
+    expect(ext.contents).not.toMatch(/\bnexusDomain\b/);
+  });
+});
+
 describe('writeEmittedFiles', () => {
   it('writes files to .gdl-out under the target dir', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-emit-'));

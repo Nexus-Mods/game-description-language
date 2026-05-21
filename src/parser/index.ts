@@ -400,6 +400,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     requiredFiles,
     ...(gameNode.has('logo')          && { logo:          String(gameNode.get('logo')) }),
     ...(gameNode.has('contributedBy') && { contributedBy: String(gameNode.get('contributedBy')) }),
+    ...(gameNode.has('nexusDomain')   && { nexusDomain:   String(gameNode.get('nexusDomain')) }),
     span: spanOf(file, source, gameSpanNode),
   };
 

@@ -28,6 +28,7 @@ export interface GameNode extends Node {
   requiredFiles: string[];
   logo?: string;
   contributedBy?: string;
+  nexusDomain?: string;
 }
 
 export type StoreId = 'steam' | 'epic' | 'gog' | 'xbox' | 'ea' | 'microsoftStore' | 'manual';

@@ -190,6 +190,7 @@ export default function main(api: IExtensionContext): boolean {
       requiredFiles: ${reqFiles},
       ${doc.game.logo ? `logo: ${sq(doc.game.logo)},` : ''}
       ${doc.game.contributedBy ? `contributedBy: ${sq(doc.game.contributedBy)},` : ''}
+      ${doc.game.nexusDomain ? `nexusDomain: ${sq(doc.game.nexusDomain)},` : ''}
     },
     [
 ${stores}
