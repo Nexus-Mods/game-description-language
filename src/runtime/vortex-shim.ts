@@ -177,24 +177,21 @@ export class GdlRuntime {
   }
 
   private async discover(stores: StoreDecl[]): Promise<DiscoveryFacts | null> {
+    const appIds = stores.map(s => String(s.value));
+    if (appIds.length === 0) return null;
     const { GameStoreHelper } = await import('vortex-api');
-    for (const s of stores) {
-      const appId = String(s.value);
-      try {
-        const found = await GameStoreHelper.findByAppId(appId, s.id);
-        if (found) {
-          return {
-            store: found.gameStoreId,
-            os: process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux',
-            arch: process.arch === 'arm64' ? 'arm64' : 'x64',
-            installPath: found.gamePath,
-            executablePath: found.gamePath,   // refined by Vortex later via game.executable()
-          };
-        }
-      } catch {
-        // Helper threw — try the next store.
-      }
+    try {
+      const found = await GameStoreHelper.findByAppId(appIds);
+      if (!found) return null;
+      return {
+        store: found.gameStoreId,
+        os: process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux',
+        arch: process.arch === 'arm64' ? 'arm64' : 'x64',
+        installPath: found.gamePath,
+        executablePath: found.gamePath,   // refined by Vortex later via game.executable()
+      };
+    } catch {
+      return null;
     }
-    return null;
   }
 }
