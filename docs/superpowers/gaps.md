@@ -6,7 +6,7 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
 
 ## Open
 
-(none — all gaps surfaced by the subnautica2 port are closed)
+(none; all gaps surfaced by the subnautica2 port are closed)
 
 ## Closed
 
@@ -16,7 +16,7 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
   (`2026-05-20-gdl-unless-predicate.md`). Installer rules now accept an
   optional `unless: <predicate>` field. When the predicate evaluates true at
   `testSupported` time, the rule self-disqualifies even if `when` would have
-  matched. The predicate uses the same composable language as `when` —
+  matched. The predicate uses the same composable language as `when`:
   typically `!any` of `!hasFile` patterns pointing at signals for a narrower
   installer. The subnautica2-shaped fixture now demonstrates `pak`
   disqualifying itself when LogicMods or Scripts are present.
@@ -48,7 +48,7 @@ game extensions. Items are surfaced by real ports (currently: `game-subnautica2`
   game needs the strict legacy behavior.
 
 - **`root` installer.** Closed by Plan 9. New `take: archive-root` strategy
-  passes archive paths through unchanged — every file's destination is
+  passes archive paths through unchanged; every file's destination is
   `${placeAt}/${source}`. Combined with `unless:` from Plan 7, the root
   installer in the fixture defers to logic-mod / ue4ss-lua / injector and
   catches archives shaped as `Subnautica2/...`, `Engine/...`, or

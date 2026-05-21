@@ -4,11 +4,11 @@
 
 **Goal:** Build the test harness layer of the GDL: inline `tests.cases:` in `game.yaml` produce real Vitest cases at codegen time, a local-cache corpus runner exercises every archive under `tests/cache/` against the installer engine, and a Nexus client populates the cache from a game's Nexus mod listing. Plus a reusable GitHub Actions workflow template.
 
-**Architecture:** No runtime changes — the engine (Plan 2) is already pure-function and testable. The codegen grows a `tests-emit.ts` that turns `tests.cases:` into Vitest `it(...)` calls importing the generated installers. A new `src/corpus/` module reads zip archives (file list only, no extraction) and feeds each one through the engine, reporting pass/fail. A new `src/nexus/` module talks to the public Nexus v1 REST API to enumerate mod files and download archives into the cache. The CLI grows `gdl test:corpus [--fetch]`. CI uses a reusable workflow that runs both layers, with the corpus cache persisted via `actions/cache`.
+**Architecture:** No runtime changes; the engine (Plan 2) is already pure-function and testable. The codegen grows a `tests-emit.ts` that turns `tests.cases:` into Vitest `it(...)` calls importing the generated installers. A new `src/corpus/` module reads zip archives (file list only, no extraction) and feeds each one through the engine, reporting pass/fail. A new `src/nexus/` module talks to the public Nexus v1 REST API to enumerate mod files and download archives into the cache. The CLI grows `gdl test:corpus [--fetch]`. CI uses a reusable workflow that runs both layers, with the corpus cache persisted via `actions/cache`.
 
-**Tech Stack:** Existing Plan 1+2 stack (Node 22, TypeScript 5.4, `yaml@2`, `vitest@3`, `webpack@5`, `commander@12`, `picomatch@4`, `pnpm@11`). New deps: `adm-zip@0.5` (zip file listing — sync, simple, sufficient for our needs). Native `fetch` for the Nexus client (Node 22).
+**Tech Stack:** Existing Plan 1+2 stack (Node 22, TypeScript 5.4, `yaml@2`, `vitest@3`, `webpack@5`, `commander@12`, `picomatch@4`, `pnpm@11`). New deps: `adm-zip@0.5` (zip file listing, sync, simple, sufficient for our needs). Native `fetch` for the Nexus client (Node 22).
 
-**Spec reference:** `docs/superpowers/specs/2026-05-20-game-description-language-design.md`, particularly §6 (testing — three layers consolidated into one `tests:` block).
+**Spec reference:** `docs/superpowers/specs/2026-05-20-game-description-language-design.md`, particularly §6 (testing: three layers consolidated into one `tests:` block).
 
 ---
 
@@ -57,7 +57,7 @@ game-description-language/
         └── nexus-mock/              (new)        # static JSON responses for nexus client
 ```
 
-Files under `src/corpus/` and `src/nexus/` are codegen-time (the CLI calls them). They do *not* ship in the bundled extension — webpack's externals + the entrypoint shape keep them out automatically.
+Files under `src/corpus/` and `src/nexus/` are codegen-time (the CLI calls them). They do *not* ship in the bundled extension; webpack's externals + the entrypoint shape keep them out automatically.
 
 ---
 
@@ -135,7 +135,7 @@ git commit -m "Add tests/case/expect AST nodes"
 
 ---
 
-## Task 2: Parser — tests block
+## Task 2: Parser: tests block
 
 **Files:**
 - Modify: `src/parser/index.ts`
@@ -216,7 +216,7 @@ Append inside `describe('parseYaml')`:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — `doc.tests` undefined.
+Expected: FAIL (`doc.tests` undefined).
 
 - [ ] **Step 3: Extend the parser**
 
@@ -316,7 +316,7 @@ Add to the return literal:
 - [ ] **Step 4: Run tests**
 
 Run: `pnpm test parser`
-Expected: PASS — including the new case.
+Expected: PASS (including the new case).
 
 Run: `pnpm test`
 Expected: 57 tests pass (56 + 1 new).
@@ -333,7 +333,7 @@ git commit -m "Parse tests block with inline cases"
 
 ---
 
-## Task 3: Validator — tests block
+## Task 3: Validator: tests block
 
 **Files:**
 - Modify: `src/schema/validator.ts`
@@ -631,7 +631,7 @@ git commit -m "Add runtime test-harness helper for plan/modType/matched assertio
 
 ---
 
-## Task 5: Codegen — emit tests.gen.ts
+## Task 5: Codegen: emit tests.gen.ts
 
 **Files:**
 - Create: `src/codegen/tests-emit.ts`
@@ -743,9 +743,9 @@ ${cases}});
 - [ ] **Step 2: Modify `src/codegen/emit.ts` to emit a separate `installers.gen.ts` AND wire `tests.gen.ts`**
 
 The current emit produces everything inline in `extension.ts`. For tests to import the rules, we need `rules` to be exported from a sibling file. Refactor so:
-- `extension.ts` — entry point that imports rules and registers them
-- `installers.gen.ts` — exports the rules array (importable by tests)
-- `tests.gen.ts` — emitted when `tests.cases` is non-empty
+- `extension.ts`: entry point that imports rules and registers them
+- `installers.gen.ts`: exports the rules array (importable by tests)
+- `tests.gen.ts`: emitted when `tests.cases` is non-empty
 
 In `src/codegen/emit.ts`, replace the existing single-file extension construction with the following structure. Find the section that constructs `extension` and `installers` strings and refactor:
 
@@ -896,14 +896,14 @@ game:
 ```
 
 Run: `pnpm test tests-emit`
-Expected: FAIL — module not found / file not emitted.
+Expected: FAIL (module not found / file not emitted).
 
 - [ ] **Step 4: Run tests after implementation**
 
 Run: `pnpm test`
 Expected: 66 tests pass (60 + 2 new + 4 existing-suite changes recovered).
 
-Verify the e2e tests still pass — the codegen now emits 4-5 files instead of 3. The existing filesystem test from MVP only checked specific files exist (not exact count), so it should be unaffected.
+Verify the e2e tests still pass; the codegen now emits 4-5 files instead of 3. The existing filesystem test from MVP only checked specific files exist (not exact count), so it should be unaffected.
 
 Run: `pnpm typecheck`
 Expected: exits 0.
@@ -920,9 +920,9 @@ git commit -m "Emit tests.gen.ts and split installers into installers.gen.ts"
 ## Task 6: Wire the `tests.gen.ts` to webpack as a test entry
 
 **Files:**
-- Modify: `src/codegen/emit.ts` — make `tests.gen.ts` import paths webpack-aware
-- Create: `tests/fixtures/e2e/expected-tests-pass.ts` (a Vitest probe — see Step 1)
-- Modify: `tests/e2e.test.ts` — assert the generated tests pass
+- Modify: `src/codegen/emit.ts` (make `tests.gen.ts` import paths webpack-aware)
+- Create: `tests/fixtures/e2e/expected-tests-pass.ts` (a Vitest probe; see Step 1)
+- Modify: `tests/e2e.test.ts` (assert the generated tests pass)
 
 This task verifies the generated tests file is actually a valid Vitest module. Strategy: after the e2e build, copy `tests.gen.ts` into a temp location and run it through Vitest CLI (or `vitest run` from the temp dir).
 
@@ -1005,7 +1005,7 @@ git commit -m "E2E: assert generated tests.gen.ts shape and case content"
 - Modify: `package.json` (add `adm-zip` + types)
 - Create: `tests/fixtures/corpus-archives/typical-pak.zip` (small test zip)
 
-Read a `.zip` file and return the list of internal paths. No extraction — just file names. This is what the installer engine needs.
+Read a `.zip` file and return the list of internal paths. No extraction; just file names. This is what the installer engine needs.
 
 - [ ] **Step 1: Add deps**
 
@@ -1101,7 +1101,7 @@ git commit -m "Add zip archive entry reader backed by adm-zip"
 ## Task 8: Local cache scanner
 
 **Files:**
-- Modify: `src/corpus/archive.ts` — add `localCachePaths`
+- Modify: `src/corpus/archive.ts` (add `localCachePaths`)
 - Modify: `tests/archive.test.ts`
 
 Scan `<cwd>/tests/cache/` for `*.zip` files and return absolute paths.
@@ -1135,7 +1135,7 @@ describe('localCachePaths', () => {
 ```
 
 Run: `pnpm test archive`
-Expected: FAIL — `localCachePaths` not exported.
+Expected: FAIL (`localCachePaths` not exported).
 
 - [ ] **Step 2: Extend `src/corpus/archive.ts`**
 
@@ -1314,7 +1314,7 @@ git commit -m "Add corpus runner that reports per-archive matched/unmatched/fail
 
 ---
 
-## Task 10: CLI — `gdl test:corpus`
+## Task 10: CLI: `gdl test:corpus`
 
 **Files:**
 - Create: `src/commands/test-corpus.ts`
@@ -1675,7 +1675,7 @@ git commit -m "Add Nexus v1 REST client: listGameModIds + listModFiles + getDown
 
 **Files:**
 - Create: `src/nexus/fetch-corpus.ts`
-- Modify: `src/commands/test-corpus.ts` — add `--fetch` flag
+- Modify: `src/commands/test-corpus.ts` (add `--fetch` flag)
 
 `fetchCorpus(gameDomain, cacheDir, apiKey)` downloads every (recently updated) mod's primary file into `cacheDir`, keyed by mod-file-version. The CLI's `--fetch` flag triggers this before running the corpus.
 
@@ -1827,7 +1827,7 @@ git commit -m "Add Nexus corpus fetcher and gdl test:corpus --fetch flag"
 
 ---
 
-## Task 13: E2E — corpus runner against fixture archives
+## Task 13: E2E: corpus runner against fixture archives
 
 **Files:**
 - Modify: `tests/e2e.test.ts`
@@ -1961,7 +1961,7 @@ git commit -m "Add reusable GitHub Actions test workflow (with optional Nexus fe
 
 ---
 
-## Task 15: Final E2E — subnautica2-shaped fixture with inline tests
+## Task 15: Final E2E: subnautica2-shaped fixture with inline tests
 
 **Files:**
 - Modify: `tests/fixtures/subnautica2-shaped/game.yaml`
@@ -2043,9 +2043,9 @@ git commit -m "E2E: subnautica2-shaped fixture exercises all installers via inli
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all suites pass
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js with build + test:corpus subcommands
+- [ ] `pnpm test` (all suites pass)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js with build + test:corpus subcommands)
 - [ ] `node dist/cli.js test:corpus --help` shows the `--fetch` flag
 - [ ] The subnautica2-shaped fixture's `.gdl-out/tests.gen.ts` mentions all four test case names
 - [ ] `.github/workflows/test.yml` references valid `actions/*` versions
@@ -2056,7 +2056,7 @@ git commit -m "E2E: subnautica2-shaped fixture exercises all installers via inli
 
 - **`gdl package`, `gdl publish`, `gdl init`, release-side GH Actions workflow** → Plan 4 (release pipeline).
 - **Real `game-subnautica2` port + diff against the legacy bundle** → Plan 5.
-- **Broader Nexus enumeration via the v2 GraphQL API** — currently `listGameModIds` only sees mods updated in the last 1 month. When real-world corpus runs need older mods, swap to v2 GraphQL with `game.mods(offset, limit)` pagination.
-- **`.7z` and `.rar` archive support** — `readZipEntries` is zip-only. Add a sibling reader and a dispatch function when a real mod needs it.
-- **Full structural signature matching for hooks** — still deferred (existence-only check from Plan 2 stands).
-- **Generated tests' `resolvedVars` precision** — branch tags resolve to the `default` arm only. A future refactor can let test cases override the resolution context.
+- **Broader Nexus enumeration via the v2 GraphQL API**: currently `listGameModIds` only sees mods updated in the last 1 month. When real-world corpus runs need older mods, swap to v2 GraphQL with `game.mods(offset, limit)` pagination.
+- **`.7z` and `.rar` archive support**: `readZipEntries` is zip-only. Add a sibling reader and a dispatch function when a real mod needs it.
+- **Full structural signature matching for hooks**: still deferred (existence-only check from Plan 2 stands).
+- **Generated tests' `resolvedVars` precision**: branch tags resolve to the `default` arm only. A future refactor can let test cases override the resolution context.

@@ -4,7 +4,7 @@
 
 **Goal:** Close gaps #1 and #2 from `docs/superpowers/gaps.md` (setup hook + did-deploy event hook). Add a declarative `setup: { ensureDirs: [...] }` block that compiles into Vortex's `IGame.setup` callback, and an `events: { did-deploy: !hook ... }` block that wires `api.events.on('did-deploy', ...)` to a user-supplied TS hook.
 
-**Architecture:** Two parallel additions, both small. The `setup` block is purely declarative — Vortex extensions overwhelmingly use the setup callback just to call `fs.ensureDirWritableAsync` for each mod root directory. The `events.did-deploy` block needs the TS escape hatch (`!hook`) because the handler logic is per-game (regenerate `mods.txt`, refresh metadata, etc.). The hook catalog gains a `didDeploy` signature alongside the existing `detectGameVersion`. The shim's `registerGame` takes two new args (`setupDirs: string[]` and `eventHooks: { didDeploy?: HookFn }`); codegen emits both. The fixture exercises both end-to-end.
+**Architecture:** Two parallel additions, both small. The `setup` block is purely declarative; Vortex extensions overwhelmingly use the setup callback just to call `fs.ensureDirWritableAsync` for each mod root directory. The `events.did-deploy` block needs the TS escape hatch (`!hook`) because the handler logic is per-game (regenerate `mods.txt`, refresh metadata, etc.). The hook catalog gains a `didDeploy` signature alongside the existing `detectGameVersion`. The shim's `registerGame` takes two new args (`setupDirs: string[]` and `eventHooks: { didDeploy?: HookFn }`); codegen emits both. The fixture exercises both end-to-end.
 
 **Tech Stack:** Existing stack. The shim adds a thin call to `util.fs.ensureDirWritableAsync` (a vortex-api helper, declared in `vortex-api.d.ts`).
 
@@ -46,7 +46,7 @@ game-description-language/
 
 ---
 
-## Task 1: AST + parser — `setup: { ensureDirs: [...] }`
+## Task 1: AST + parser: `setup: { ensureDirs: [...] }`
 
 **Files:**
 - Modify: `src/parser/ast.ts`
@@ -83,7 +83,7 @@ export interface EventsNode extends Node {
 }
 ```
 
-`HookRef` already exists (from Plan 2's `!hook` machinery — used by `discovery.version`). Find its definition and confirm; if absent, use:
+`HookRef` already exists (from Plan 2's `!hook` machinery, used by `discovery.version`). Find its definition and confirm; if absent, use:
 
 ```ts
 export interface HookRef {
@@ -120,7 +120,7 @@ setup:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — `doc.setup` is undefined.
+Expected: FAIL (`doc.setup` is undefined).
 
 - [ ] **Step 3: Extend `src/parser/index.ts`**
 
@@ -188,7 +188,7 @@ git commit -m "Parse setup.ensureDirs block"
 
 ---
 
-## Task 2: AST + parser + hook catalog — `events: { did-deploy: !hook ... }`
+## Task 2: AST + parser + hook catalog: `events: { did-deploy: !hook ... }`
 
 **Files:**
 - Modify: `src/parser/ast.ts`
@@ -201,7 +201,7 @@ git commit -m "Parse setup.ensureDirs block"
 
 - [ ] **Step 1: Confirm `EventsNode` already in `ast.ts`** (added in Task 1's stub)
 
-The EventsNode added in Task 1 expects `didDeploy?: HookRef`. If `HookRef` doesn't exist yet (it does — Plan 2 added it for `!hook` in discovery), find or add the type.
+The EventsNode added in Task 1 expects `didDeploy?: HookRef`. If `HookRef` doesn't exist yet (Plan 2 added it for `!hook` in discovery), find or add the type.
 
 - [ ] **Step 2: Failing test in `tests/parser.test.ts`**
 
@@ -292,7 +292,7 @@ Append:
 ```
 
 Run: `pnpm test hooks`
-Expected: FAIL — `HOOK_CATALOG.didDeploy` undefined.
+Expected: FAIL (`HOOK_CATALOG.didDeploy` undefined).
 
 - [ ] **Step 5: Add `didDeploy` to `HOOK_CATALOG` in `src/runtime/hooks.ts`**
 
@@ -311,7 +311,7 @@ export const HOOK_CATALOG = {
 } as const;
 ```
 
-If `HOOK_CATALOG`'s shape uses interfaces or other definitions, follow the existing pattern. The exact field names may be `signature` / `argType` — match the existing catalog.
+If `HOOK_CATALOG`'s shape uses interfaces or other definitions, follow the existing pattern. The exact field names may be `signature` / `argType`; match the existing catalog.
 
 - [ ] **Step 6: Run tests**
 
@@ -334,7 +334,7 @@ git commit -m "Parse events.did-deploy + register didDeploy hook signature"
 
 ---
 
-## Task 3: Validator — setup + events
+## Task 3: Validator: setup + events
 
 **Files:**
 - Modify: `src/schema/validator.ts`
@@ -396,7 +396,7 @@ events:
 ```
 
 Run: `pnpm test validator`
-Expected: FAIL (first test — empty entry not rejected).
+Expected: FAIL (first test; empty entry not rejected).
 
 - [ ] **Step 2: Extend `src/schema/validator.ts`**
 
@@ -438,7 +438,7 @@ git commit -m "Validate setup.ensureDirs entries; allow events.did-deploy with !
 
 ---
 
-## Task 4: vortex-api.d.ts — `util.fs.ensureDirWritableAsync` + `api.events`
+## Task 4: vortex-api.d.ts: `util.fs.ensureDirWritableAsync` + `api.events`
 
 **Files:**
 - Modify: `src/types/vortex-api.d.ts`
@@ -508,7 +508,7 @@ git commit -m "Vortex-api types: util.fs.ensureDirWritableAsync, api.events.on, 
 
 ---
 
-## Task 5: Shim — `registerGame` accepts setup + event hooks
+## Task 5: Shim: `registerGame` accepts setup + event hooks
 
 **Files:**
 - Modify: `src/runtime/vortex-shim.ts`
@@ -610,7 +610,7 @@ git commit -m "Shim: registerGame accepts setupDirs and event hooks (did-deploy)
 
 ---
 
-## Task 6: Codegen — emit setup + events arguments
+## Task 6: Codegen: emit setup + events arguments
 
 **Files:**
 - Modify: `src/codegen/emit.ts`
@@ -784,7 +784,7 @@ git commit -m "Codegen: emit setupDirs and eventHooks (did-deploy) in registerGa
 
 ---
 
-## Task 7: E2E — subnautica2-shaped fixture exercises setup + events
+## Task 7: E2E: subnautica2-shaped fixture exercises setup + events
 
 **Files:**
 - Modify: `tests/fixtures/subnautica2-shaped/game.yaml`
@@ -900,9 +900,9 @@ git commit -m "Close lifecycle-hook gaps (setup + did-deploy) — implemented in
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all 133 tests pass
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js
+- [ ] `pnpm test` (133 tests pass)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js)
 - [ ] The subnautica2-shaped fixture's bundle contains `ensureDirWritableAsync`, `events.on('did-deploy'`, and `regenerateModsTxt`
 - [ ] `docs/superpowers/gaps.md` has 2 open items left (Xbox arch in installers + per-instance getPath)
 
@@ -918,6 +918,6 @@ Small follow-up.
 
 ## What this plan does not deliver (and where it goes)
 
-- **Other lifecycle events** (`will-deploy`, `gamemode-activated`, etc.) — extend `EventsNode` when a real game needs them.
+- **Other lifecycle events** (`will-deploy`, `gamemode-activated`, etc.): extend `EventsNode` when a real game needs them.
 - **`setup: { hook: !hook ... }` escape hatch** for non-directory-creation setup logic. Add when a real game needs it.
 - **Type-safe `deployment` parameter** in the didDeploy hook. Currently `unknown`; users cast if they need the structure. Future: import Vortex's `IDeploymentManifest` into the hook catalog.

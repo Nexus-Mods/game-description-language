@@ -2,12 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close gap #2 from `docs/superpowers/gaps.md` (the UE4SS injector pattern) by adding three small refinements to the installer engine: case-insensitive glob matching by default, shallowest-anchor selection by default, and install-root scoping for file-shaped anchors. With these, the UE4SS injector — and any other "find marker, route the directory containing it" installer — becomes expressible in the existing single-installer form.
+**Goal:** Close gap #2 from `docs/superpowers/gaps.md` (the UE4SS injector pattern) by adding three small refinements to the installer engine: case-insensitive glob matching by default, shallowest-anchor selection by default, and install-root scoping for file-shaped anchors. With these, the UE4SS injector (and any other "find marker, route the directory containing it" installer) becomes expressible in the existing single-installer form.
 
 **Architecture:** Three independent tweaks, all in `src/runtime/glob.ts` and `src/runtime/installer-engine.ts`. Each is additive against the current behavior:
 - `compileGlob` flips `nocase: true` (no test should regress; existing tests use consistent casing).
 - A new `findShallowest` joins `findFirst` in `glob.ts`; the installer engine swaps to it.
-- The file-anchor branch of `stripPath` returns `''` for paths that aren't under the install root — same exclusion contract the directory-anchor branch already uses. Existing tests' archives all keep their files under the install root, so no regression.
+- The file-anchor branch of `stripPath` returns `''` for paths that aren't under the install root (same exclusion contract the directory-anchor branch already uses). Existing tests' archives all keep their files under the install root, so no regression.
 
 **Tech Stack:** Existing stack. No new deps.
 
@@ -39,7 +39,7 @@ game-description-language/
 - Modify: `src/runtime/glob.ts`
 - Modify: `tests/glob.test.ts`
 
-Mods in the wild have inconsistent filename casing (`DwMapi.DLL` vs `dwmapi.dll`). The legacy subnautica2 code lowercases basenames before comparing. picomatch already supports case-insensitive matching via the `nocase` flag — we just need to flip it.
+Mods in the wild have inconsistent filename casing (`DwMapi.DLL` vs `dwmapi.dll`). The legacy subnautica2 code lowercases basenames before comparing. picomatch already supports case-insensitive matching via the `nocase` flag; we just need to flip it.
 
 - [ ] **Step 1: Failing test in `tests/glob.test.ts`**
 
@@ -92,7 +92,7 @@ Run: `pnpm test glob`
 Expected: PASS (all glob tests including the 2 new case-insensitivity ones).
 
 Run: `pnpm test`
-Expected: 112 tests pass (no regressions — every existing test uses consistent casing).
+Expected: 112 tests pass (no regressions; every existing test uses consistent casing).
 
 Run: `pnpm typecheck`
 Expected: exits 0.
@@ -114,7 +114,7 @@ git commit -m "Glob: match case-insensitively by default (matches Windows filesy
 - Modify: `tests/glob.test.ts`
 - Modify: `tests/installer-engine.test.ts`
 
-When multiple files match the anchor pattern, the engine should pick the shallowest one (fewest path segments), not the first one in archive order. The legacy `findInjectorMarker` does exactly this. Most archives put shallowest files first, so the change is invisible most of the time — but it's correct under all archive orderings.
+When multiple files match the anchor pattern, the engine should pick the shallowest one (fewest path segments), not the first one in archive order. The legacy `findInjectorMarker` does exactly this. Most archives put shallowest files first, so the change is invisible most of the time, but it is correct under all archive orderings.
 
 - [ ] **Step 1: Failing test for `findShallowest` in `tests/glob.test.ts`**
 
@@ -149,7 +149,7 @@ describe('findShallowest', () => {
 ```
 
 Run: `pnpm test glob`
-Expected: FAIL — `findShallowest` not exported.
+Expected: FAIL (`findShallowest` not exported).
 
 - [ ] **Step 2: Add `findShallowest` to `src/runtime/glob.ts`**
 
@@ -216,7 +216,7 @@ describe('buildInstallPlan — shallowest anchor selection', () => {
 ```
 
 Run: `pnpm test installer-engine`
-Expected: FAIL — the deeper marker is picked first by `findFirst`, so destinations are off.
+Expected: FAIL (the deeper marker is picked first by `findFirst`, so destinations are off).
 
 - [ ] **Step 4: Use `findShallowest` in `src/runtime/installer-engine.ts`**
 
@@ -240,12 +240,12 @@ Change to:
 const anchorHit = findShallowest(archivePaths, matcher);
 ```
 
-(Both occurrences — once at the single-form branch, once at the route-form branch.)
+(Both occurrences: once at the single-form branch, once at the route-form branch.)
 
 - [ ] **Step 5: Run tests**
 
 Run: `pnpm test installer-engine`
-Expected: PASS — all existing + the new shallowest test.
+Expected: PASS (all existing + the new shallowest test).
 
 Run: `pnpm test`
 Expected: 116 tests pass (112 + 3 glob + 1 installer-engine).
@@ -269,7 +269,7 @@ git commit -m "Engine: pick shallowest matching file as anchor (was first-in-arc
 - Modify: `src/runtime/installer-engine.ts`
 - Modify: `tests/installer-engine.test.ts`
 
-For file-shaped anchors, `stripPath` should return `''` when a file isn't under the install root — the same exclusion contract the directory-anchor branch already uses. The install root is the first `dropCount` segments of the anchor match.
+For file-shaped anchors, `stripPath` should return `''` when a file isn't under the install root (the same exclusion contract the directory-anchor branch already uses). The install root is the first `dropCount` segments of the anchor match.
 
 - [ ] **Step 1: Failing test in `tests/installer-engine.test.ts`**
 
@@ -334,7 +334,7 @@ describe('buildInstallPlan — install-root scoping for file anchors', () => {
 ```
 
 Run: `pnpm test installer-engine`
-Expected: FAIL — the first test currently includes the outsider files in the plan.
+Expected: FAIL (the first test currently includes the outsider files in the plan).
 
 - [ ] **Step 2: Add the install-root filter to the file-anchor branch of `stripPath`**
 
@@ -381,7 +381,7 @@ Replace with:
 - [ ] **Step 3: Run tests**
 
 Run: `pnpm test installer-engine`
-Expected: PASS — both new cases, plus all existing tests (the existing fixtures keep their files under the install root, so they're unaffected).
+Expected: PASS (both new cases, plus all existing tests; the existing fixtures keep their files under the install root, so they're unaffected).
 
 Run: `pnpm test`
 Expected: 118 tests pass (116 + 2).
@@ -398,7 +398,7 @@ git commit -m "Engine: scope file-anchor installers to files under the install r
 
 ---
 
-## Task 4: E2E — subnautica2-shaped fixture exercises the UE4SS injector
+## Task 4: E2E: subnautica2-shaped fixture exercises the UE4SS injector
 
 **Files:**
 - Modify: `tests/fixtures/subnautica2-shaped/game.yaml`
@@ -488,10 +488,10 @@ Find the subnautica2-shaped describe block. After the existing bundle assertions
 - [ ] **Step 3: Run tests**
 
 Run: `pnpm test e2e`
-Expected: PASS — the subnautica2-shaped test now also asserts the new fixture content and bundle strings.
+Expected: PASS (the subnautica2-shaped test now also asserts the new fixture content and bundle strings).
 
 Run: `pnpm test`
-Expected: 118 tests still pass (no new `it` block — the assertions extend an existing one).
+Expected: 118 tests still pass (no new `it` block; the assertions extend an existing one).
 
 Run: `pnpm typecheck`
 Expected: exits 0.
@@ -544,9 +544,9 @@ git commit -m "Close gap #2 (UE4SS injector pattern) — implemented in Plan 8"
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all 118 tests pass
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js
+- [ ] `pnpm test` (118 tests pass)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js)
 - [ ] The subnautica2-shaped fixture's bundle contains `'ue4ss-injector'`
 - [ ] `docs/superpowers/gaps.md` has item 2 moved to Closed; remaining open items renumbered correctly
 
@@ -554,7 +554,7 @@ git commit -m "Close gap #2 (UE4SS injector pattern) — implemented in Plan 8"
 
 ## After this plan: update the subnautica2 port
 
-Once Plan 8 lands, bump the subnautica2 port's submodule and add the `ue4ss-injector` installer to its `game.yaml` (mirroring the fixture). That's a small follow-up — same pattern as the Plan 6/7 port updates.
+Once Plan 8 lands, bump the subnautica2 port's submodule and add the `ue4ss-injector` installer to its `game.yaml` (mirroring the fixture). That's a small follow-up; same pattern as the Plan 6/7 port updates.
 
 ## What this plan does not deliver (and where it goes)
 

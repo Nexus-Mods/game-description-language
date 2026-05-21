@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add full installer support to the GDL toolchain — `installers:` rules with anchor/take/placeAt single form and `route:` composite form, pattern matchers (`!hasFile`/`!hasFiles`/`!matches`), predicate combinators (`!when`/`!any`/`!all`/`!not` + comparators), `!hook` references with compile-time validation, real Vortex discovery via `GameStoreHelper`, and source maps from generated TS back to YAML — enough to port `game-subnautica2`.
+**Goal:** Add full installer support to the GDL toolchain: `installers:` rules with anchor/take/placeAt single form and `route:` composite form, pattern matchers (`!hasFile`/`!hasFiles`/`!matches`), predicate combinators (`!when`/`!any`/`!all`/`!not` + comparators), `!hook` references with compile-time validation, real Vortex discovery via `GameStoreHelper`, and source maps from generated TS back to YAML (enough to port `game-subnautica2`).
 
 **Architecture:** Same package layout as MVP. The runtime grows three modules (glob, pattern-matcher, installer-engine) whose pure-function cores make them trivially testable. The codegen grows: it now resolves `!hook` references against the user's `src/hooks.ts` via the TypeScript compiler API, emits per-installer functions, and writes `.ts.map` source maps. The Vortex shim grows `registerInstaller` and a real `discover()` that walks declared stores through `GameStoreHelper`.
 
-**Tech Stack:** Existing Plan 1 stack (Node 22, TypeScript 5.4, `yaml@2`, `vitest@3`, `webpack@5` + `ts-loader`, `commander@12`, `pnpm@11`). New runtime dep: `picomatch@4` for glob matching (small, battle-tested, ships in the bundle). The TypeScript compiler API is already available via the existing `typescript` devDep.
+**Tech Stack:** Existing Plan 1 stack (Node 22, TypeScript 5.4, `yaml@2`, `vitest@3`, `webpack@5` + `ts-loader`, `commander@12`, `pnpm@11`). New runtime dep: `picomatch@4` for glob matching (small, ships in the bundle). The TypeScript compiler API is already available via the existing `typescript` devDep.
 
 **Spec reference:** `docs/superpowers/specs/2026-05-20-game-description-language-design.md`, §3.3 (evaluation tags), §3.5 (pattern syntax), §3.6 (installers), §4 phase 4 (hook resolution), §4 phase 6 (source maps), §5 (installer engine + Vortex shim).
 
@@ -59,7 +59,7 @@ game-description-language/
         └── subnautica2-shaped/      (new)        # late-plan validation fixture
 ```
 
-`tests/fixtures/subnautica2-shaped/` mirrors the subnautica2 extension's shape (pak / LogicMods / UE4SS-Lua) for the final E2E. It is not the real port — that's Plan 5 — but it exercises the same installer combinations.
+`tests/fixtures/subnautica2-shaped/` mirrors the subnautica2 extension's shape (pak / LogicMods / UE4SS-Lua) for the final E2E. It is not the real port (that's Plan 5), but it exercises the same installer combinations.
 
 ---
 
@@ -308,7 +308,7 @@ export interface DocumentNode extends Node {
 - [ ] **Step 2: Typecheck**
 
 Run: `pnpm typecheck`
-Expected: PASS. No callers of `ValueNode` yet need to handle the new `hookRef` variant — but emit.ts in codegen will (Task 14).
+Expected: PASS. No callers of `ValueNode` yet need to handle the new `hookRef` variant, but emit.ts in codegen will (Task 14).
 
 - [ ] **Step 3: Commit**
 
@@ -319,7 +319,7 @@ git commit -m "Add installer/predicate/hook AST nodes"
 
 ---
 
-## Task 3: Parser — pattern tags (`!hasFile`, `!hasFiles`, `!matches`)
+## Task 3: Parser: pattern tags (`!hasFile`, `!hasFiles`, `!matches`)
 
 **Files:**
 - Modify: `src/parser/tags.ts`
@@ -418,7 +418,7 @@ Append inside `describe('parseYaml')`:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — installers undefined.
+Expected: FAIL (installers undefined).
 
 - [ ] **Step 4: Extend `src/parser/index.ts`**
 
@@ -661,7 +661,7 @@ git commit -m "Parse installer rules with !hasFile predicate"
 
 ---
 
-## Task 4: Validator — installer rules
+## Task 4: Validator: installer rules
 
 **Files:**
 - Modify: `src/schema/validator.ts`
@@ -839,7 +839,7 @@ git commit -m "Validate installer rules: ids, modType refs, single XOR route"
 
 ---
 
-## Task 5: Runtime — pattern matchers (`!hasFile`/`!hasFiles`/`!matches`)
+## Task 5: Runtime: pattern matchers (`!hasFile`/`!hasFiles`/`!matches`)
 
 **Files:**
 - Create: `src/runtime/pattern-matcher.ts`
@@ -934,7 +934,7 @@ git commit -m "Add runtime pattern predicate evaluator"
 
 ---
 
-## Task 6: Runtime — predicate combinators (`!when`/`!any`/`!all`/`!not`)
+## Task 6: Runtime: predicate combinators (`!when`/`!any`/`!all`/`!not`)
 
 **Files:**
 - Create: `src/runtime/predicate.ts`
@@ -1106,7 +1106,7 @@ git commit -m "Add predicate combinator evaluator with semver comparisons"
 
 ---
 
-## Task 7: Runtime — installer engine
+## Task 7: Runtime: installer engine
 
 **Files:**
 - Create: `src/runtime/installer-engine.ts`
@@ -1353,7 +1353,7 @@ git commit -m "Add runtime installer engine (single + route forms)"
 
 ---
 
-## Task 8: Vortex shim — `registerInstaller`
+## Task 8: Vortex shim: `registerInstaller`
 
 **Files:**
 - Modify: `src/types/vortex-api.d.ts`
@@ -1505,7 +1505,7 @@ Run: `pnpm typecheck`
 Expected: PASS.
 
 Run: `pnpm test`
-Expected: all existing tests still pass (no installer test runs yet — codegen comes next).
+Expected: all existing tests still pass (no installer test runs yet; codegen comes next).
 
 - [ ] **Step 4: Commit**
 
@@ -1516,7 +1516,7 @@ git commit -m "Wire registerInstaller through the GdlRuntime shim"
 
 ---
 
-## Task 9: Codegen — emit installers
+## Task 9: Codegen: emit installers
 
 **Files:**
 - Modify: `src/codegen/emit.ts`
@@ -1677,7 +1677,7 @@ git commit -m "Emit installer rules in generated extension.ts"
 
 ---
 
-## Task 10: End-to-end checkpoint — installer through the pipeline
+## Task 10: End-to-end checkpoint: installer through the pipeline
 
 **Files:**
 - Modify: `tests/fixtures/e2e/game.yaml`
@@ -1739,7 +1739,7 @@ git commit -m "E2E: extend fixture with installer rule"
 
 ---
 
-## Task 11: Parser — `!hook` and `discovery:` block
+## Task 11: Parser: `!hook` and `discovery:` block
 
 **Files:**
 - Modify: `src/parser/index.ts`
@@ -1774,7 +1774,7 @@ Append inside `describe('parseYaml')`:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — `doc.discovery` undefined.
+Expected: FAIL (`doc.discovery` undefined).
 
 - [ ] **Step 3: Extend the parser**
 
@@ -1815,7 +1815,7 @@ Add to the return literal:
 ...(discovery !== undefined && { discovery }),
 ```
 
-Also extend `parseValueNode` to recognize `!hook` scalars (for completeness — hooks can appear in `context:` values too in future, but discovery.version is the only catalog entry today):
+Also extend `parseValueNode` to recognize `!hook` scalars (for completeness; hooks can appear in `context:` values too in future, but discovery.version is the only catalog entry today):
 
 Add to `parseValueNode` (before the scalar literal/interpolated check):
 
@@ -1827,7 +1827,7 @@ if (isScalar(node) && (node as { tag?: unknown }).tag === HOOK_TAG && typeof nod
 
 - [ ] **Step 4: Extend `renderValueNode` in `src/codegen/emit.ts` to keep the `ValueNode` union exhaustive**
 
-Adding `hookRef` to the `ValueNode` AST (Task 2) and parsing it (above) makes the union wider. The existing `renderValueNode` from Plan 1 narrows to branch tags after the literal/interpolated early-returns and accesses `.arms` — which doesn't exist on `hookRef`. Without a handler, TypeScript's exhaustiveness checking fails the build.
+Adding `hookRef` to the `ValueNode` AST (Task 2) and parsing it (above) makes the union wider. The existing `renderValueNode` from Plan 1 narrows to branch tags after the literal/interpolated early-returns and accesses `.arms` (which doesn't exist on `hookRef`). Without a handler, TypeScript's exhaustiveness checking fails the build.
 
 Add a hookRef early-return to `renderValueNode` (just after the interpolated check, before the branch handling):
 
@@ -2115,7 +2115,7 @@ git commit -m "Resolve hooks during build (fail closed when src/hooks.ts is miss
 
 ---
 
-## Task 14: Codegen — emit hook imports and discovery wiring
+## Task 14: Codegen: emit hook imports and discovery wiring
 
 **Files:**
 - Modify: `src/codegen/emit.ts`
@@ -2310,7 +2310,7 @@ Run: `pnpm typecheck`
 Expected: PASS.
 
 Run: `pnpm test`
-Expected: all suites pass (the e2e test doesn't actually run discovery — it just checks the bundle contains the right code).
+Expected: all suites pass (the e2e test doesn't actually run discovery; it just checks the bundle contains the right code).
 
 - [ ] **Step 4: Commit**
 
@@ -2321,7 +2321,7 @@ git commit -m "Wire GameStoreHelper-based discovery through the shim"
 
 ---
 
-## Task 16: Source maps — YAML → generated TS
+## Task 16: Source maps: YAML → generated TS
 
 **Files:**
 - Create: `src/codegen/source-map.ts`
@@ -2456,7 +2456,7 @@ Expected: PASS.
 
 - [ ] **Step 4: Wire emission of `.map` files in `src/codegen/emit.ts`**
 
-Add a `lineMappings: LineMapping[]` to the emit function's local state. Each major AST node's emitted block records the YAML line/column it came from. For Plan 2, mappings are coarse — one mapping per installer rule and per modType — since the engine's runtime errors will trace to those.
+Add a `lineMappings: LineMapping[]` to the emit function's local state. Each major AST node's emitted block records the YAML line/column it came from. For Plan 2, mappings are coarse (one mapping per installer rule and per modType) since the engine's runtime errors will trace to those.
 
 Extend `emit()` to collect mappings as it builds the extension string. After the extension string is built, call `buildSourceMap` and return `{ path: 'extension.ts.map', contents: JSON.stringify(map) }` as an additional emitted file.
 
@@ -2499,7 +2499,7 @@ git commit -m "Emit source maps from generated TS back to YAML positions"
 
 ---
 
-## Task 17: Webpack — chain source maps through the bundle
+## Task 17: Webpack: chain source maps through the bundle
 
 **Files:**
 - Modify: `src/bundler/webpack.config.ts`
@@ -2530,7 +2530,7 @@ After the existing assertions, add:
 - [ ] **Step 3: Run tests**
 
 Run: `pnpm test bundler && pnpm test e2e`
-Expected: PASS — `extension.js.map` exists alongside the bundle.
+Expected: PASS (`extension.js.map` exists alongside the bundle).
 
 Run: `pnpm test`
 Expected: full suite passes.
@@ -2544,7 +2544,7 @@ git commit -m "Enable webpack source maps so bundle traces back to YAML"
 
 ---
 
-## Task 18: Final E2E — subnautica2-shaped fixture
+## Task 18: Final E2E: subnautica2-shaped fixture
 
 **Files:**
 - Create: `tests/fixtures/subnautica2-shaped/game.yaml`
@@ -2552,7 +2552,7 @@ git commit -m "Enable webpack source maps so bundle traces back to YAML"
 - Create: `tests/fixtures/subnautica2-shaped/src/hooks.ts`
 - Modify: `tests/e2e.test.ts`
 
-A fixture that mirrors subnautica2's actual shape: three mod types (pak/logic-mod/ue4ss-lua), three installers, store branches, version hook. Not a real port — just shape-equivalent.
+A fixture that mirrors subnautica2's actual shape: three mod types (pak/logic-mod/ue4ss-lua), three installers, store branches, version hook. Not a real port, just shape-equivalent.
 
 - [ ] **Step 1: Create `tests/fixtures/subnautica2-shaped/game.yaml`**
 
@@ -2693,7 +2693,7 @@ describe('end-to-end (subnautica2-shaped)', () => {
 Run: `pnpm test e2e`
 Expected: PASS (within 90s).
 
-If the test fails, debug the specific failure — most likely candidates:
+If the test fails, debug the specific failure (most likely candidates):
 - A pattern parse error (check the fixture's YAML carefully)
 - A hook-resolver path issue (check `src/hooks.ts` location)
 - A webpack alias issue (the alias must resolve `@gdl/runtime` to the source)
@@ -2708,7 +2708,7 @@ git commit -m "E2E: subnautica2-shaped fixture covers all installer features"
 
 ---
 
-## Task 19: Polish — bundler tsconfig and runtime barrel
+## Task 19: Polish: bundler tsconfig and runtime barrel
 
 **Files:**
 - Modify: `src/bundler/tsconfig.bundle.json`
@@ -2771,9 +2771,9 @@ git commit -m "Polish: align bundler tsconfig strictness; expose GameContext"
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all suites pass (estimated 35+ tests across 11 suites by end of plan)
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js + runtime + bundler artifacts
+- [ ] `pnpm test` (all suites pass; estimated 35+ tests across 11 suites by end of plan)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js + runtime + bundler artifacts)
 - [ ] `node dist/cli.js build` against the subnautica2-shaped fixture produces a valid `dist/extension.js`, `dist/extension.js.map`, `dist/info.json`
 - [ ] Hook validation: deleting `src/hooks.ts` from a fixture that needs it produces a `GDL071` error pointing at the missing file
 - [ ] Installer pattern matching: a fixture archive with `MyMod/Scripts/main.lua` routes through the ue4ss-lua installer
@@ -2788,4 +2788,4 @@ git commit -m "Polish: align bundler tsconfig strictness; expose GameContext"
 - **Real `game-subnautica2` port + diff against the legacy bundle** → Plan 5.
 - **Tools (`tools:`), load order (`loadOrder:`), prelaunch (`prelaunch:`), diagnostics (`diagnostics:`)** → Plan 3 or later, as needed by ported games.
 - **Full structural signature matching for hooks** (currently we only verify the export exists) → Plan 3 or revisit if a real bug surfaces.
-- **`renderInstaller`'s branch-tag fallthrough in `placeAt`** — currently emits `'undefined'`. If a fixture exercises it, extend `renderInstaller`. Out of scope today.
+- **`renderInstaller`'s branch-tag fallthrough in `placeAt`**: currently emits `'undefined'`. If a fixture exercises it, extend `renderInstaller`. Out of scope today.

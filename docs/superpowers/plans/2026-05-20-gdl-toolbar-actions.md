@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close gap #7 from `docs/superpowers/gaps.md`: let `game.yaml` declare toolbar actions that Vortex renders next to the game's mod list. MVP supports two action kinds — `!openFile <template>` and `!openUrl <template>` — both of which interpolate against the resolved context. Each action shows only when the GDL-registered game is the active one in Vortex.
+**Goal:** Close gap #7 from `docs/superpowers/gaps.md`: let `game.yaml` declare toolbar actions that Vortex renders next to the game's mod list. MVP supports two action kinds (`!openFile <template>` and `!openUrl <template>`), both of which interpolate against the resolved context. Each action shows only when the GDL-registered game is the active one in Vortex.
 
 **Architecture:** New `toolbarActions:` top-level block in `game.yaml`. The parser recognises `!openFile`/`!openUrl` value tags. The shim grows `registerToolbarAction` that wraps Vortex's `context.registerAction('mod-icons', ...)`. At click time, the registered callback reads the resolved context and interpolates the path/URL template, then opens it via `util.opn` (the standard Vortex helper for both files and URLs).
 
@@ -172,7 +172,7 @@ Append inside `describe('parseYaml')`:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — `doc.toolbarActions` undefined.
+Expected: FAIL (`doc.toolbarActions` undefined).
 
 - [ ] **Step 4: Extend `src/parser/index.ts`**
 
@@ -256,7 +256,7 @@ git commit -m "Parse toolbarActions block with !openFile and !openUrl"
 
 ---
 
-## Task 3: Validator — toolbar actions
+## Task 3: Validator: toolbar actions
 
 **Files:**
 - Modify: `src/schema/validator.ts`
@@ -458,7 +458,7 @@ git commit -m "Vortex-api types: registerAction, util.opn, selectors.activeGameI
 
 ---
 
-## Task 5: Runtime shim — `registerToolbarAction`
+## Task 5: Runtime shim: `registerToolbarAction`
 
 **Files:**
 - Modify: `src/runtime/vortex-shim.ts`
@@ -578,7 +578,7 @@ git commit -m "Shim: registerToolbarAction wires open-file/open-url to Vortex mo
 
 ---
 
-## Task 6: Codegen — emit toolbar action registrations
+## Task 6: Codegen: emit toolbar action registrations
 
 **Files:**
 - Modify: `src/codegen/emit.ts`
@@ -695,7 +695,7 @@ git commit -m "Emit toolbar action registrations in generated extension.ts"
 
 ---
 
-## Task 7: E2E — subnautica2-shaped fixture with toolbar actions
+## Task 7: E2E: subnautica2-shaped fixture with toolbar actions
 
 **Files:**
 - Modify: `tests/fixtures/subnautica2-shaped/game.yaml`
@@ -790,9 +790,9 @@ git commit -m "Close gap #7 (toolbar actions) — implemented in Plan 6"
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all 105 tests pass
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js cleanly
+- [ ] `pnpm test` (105 tests pass)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js cleanly)
 - [ ] The subnautica2-shaped e2e fixture's bundle contains `registerAction` and the three action ids
 - [ ] `docs/superpowers/gaps.md` has item 7 moved to "Closed"
 
@@ -804,7 +804,7 @@ Once Plan 6 lands on `gdl-mvp` and is pushed to `Nexus-Mods/game-description-lan
 
 ## What this plan does not deliver (and where it goes)
 
-- **Custom click handlers via `!hook <id>`** — for the rare action that needs TS logic. Add when a real game needs it.
+- **Custom click handlers via `!hook <id>`**: for the rare action that needs TS logic. Add when a real game needs it.
 - **Other Vortex action groups** (mods-list, gamemode-toolbar). Add as needed.
 - **Conditional visibility predicates** beyond "game-active." For example, "only show when a specific mod is installed." Add when a real game needs it.
 - **Icon customization.** Currently all actions use the `'open-ext'` glyph. Add an optional `icon:` field when there's a reason.

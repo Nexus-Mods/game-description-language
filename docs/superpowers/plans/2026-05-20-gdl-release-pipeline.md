@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the release infrastructure for GDL-based extensions: `gdl package` (build + zip), `gdl publish-info` (CI-friendly accessor), `gdl init` (scaffold a new extension repo), and a reusable `release.yml` workflow that the extension repo references with zero per-extension parameters. **No actual Nexus uploads happen during this plan** — the workflow is wired but only fires on a `v*` tag push, and no such tag is pushed.
+**Goal:** Build the release infrastructure for GDL-based extensions: `gdl package` (build + zip), `gdl publish-info` (CI-friendly accessor), `gdl init` (scaffold a new extension repo), and a reusable `release.yml` workflow that the extension repo references with zero per-extension parameters. **No actual Nexus uploads happen during this plan**; the workflow is wired but only fires on a `v*` tag push, and no such tag is pushed.
 
 **Architecture:** All release metadata lives in `game.yaml`'s `nexus:` block (`modId`, `fileGroupId`, `displayName`). The `publish-info <field>` CLI verb reads from that block and prints to stdout; the reusable workflow shells out to it for every value, so an extension's `.github/workflows/ci.yml` has two `uses:` lines and no per-extension config. Packaging is a thin wrapper around the existing `gdl build` + a zip step. The init scaffolder writes a fixed set of small template files.
 
-**Tech Stack:** Existing stack (Node 22, TypeScript 5.4, `yaml@2`, `vitest@3`, `webpack@5`, `commander@12`, `adm-zip@0.5`, `pnpm@11`). The release workflow uses the published `Nexus-Mods/upload-action@main` action — we do not write a Nexus upload client.
+**Tech Stack:** Existing stack (Node 22, TypeScript 5.4, `yaml@2`, `vitest@3`, `webpack@5`, `commander@12`, `adm-zip@0.5`, `pnpm@11`). The release workflow uses the published `Nexus-Mods/upload-action@main` action; we do not write a Nexus upload client.
 
 **Spec reference:** `docs/superpowers/specs/2026-05-20-game-description-language-design.md`, §7 (release pipeline).
 
@@ -119,7 +119,7 @@ nexus:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — `doc.nexus` undefined.
+Expected: FAIL (`doc.nexus` undefined).
 
 - [ ] **Step 3: Extend `src/parser/index.ts`**
 
@@ -248,7 +248,7 @@ git commit -m "Parse and validate the nexus block (modId, fileGroupId, displayNa
 
 ---
 
-## Task 2: Packaging — `zipDist` helper
+## Task 2: Packaging: `zipDist` helper
 
 **Files:**
 - Create: `src/packaging/zip.ts`
@@ -365,7 +365,7 @@ git commit -m "Add zipDist helper for packaging dist/ into a Nexus-shaped zip"
 
 ---
 
-## Task 3: CLI — `gdl package`
+## Task 3: CLI: `gdl package`
 
 **Files:**
 - Create: `src/commands/package.ts`
@@ -473,7 +473,7 @@ git commit -m "Add gdl package CLI: build + zip to out/<id>-vortex-v<ver>.zip"
 
 ---
 
-## Task 4: CLI — `gdl publish-info <field>`
+## Task 4: CLI: `gdl publish-info <field>`
 
 **Files:**
 - Create: `src/commands/publish-info.ts`
@@ -554,7 +554,7 @@ game:
 ```
 
 Run: `pnpm test publish-info`
-Expected: FAIL — module not found.
+Expected: FAIL (module not found).
 
 - [ ] **Step 2: Implement `src/commands/publish-info.ts`**
 
@@ -652,7 +652,7 @@ git commit -m "Add gdl publish-info CLI: print release metadata fields from game
 - Create: `src/templates/gitignore.tmpl`
 - Create: `src/templates/README.md.tmpl`
 
-The template files are static text with `{{GAME_ID}}` placeholders. Pure data files — no logic.
+The template files are static text with `{{GAME_ID}}` placeholders. Pure data files, no logic.
 
 - [ ] **Step 1: Create `src/templates/game.yaml.tmpl`**
 
@@ -766,7 +766,7 @@ Bump `package.json#version`, commit, tag `v<version>`, push. CI does the rest.
 | Path                | Purpose                                            |
 |---------------------|----------------------------------------------------|
 | `game.yaml`         | The whole extension definition                     |
-| `src/hooks.ts`      | TypeScript hooks (version detection, etc.) — optional |
+| `src/hooks.ts`      | TypeScript hooks (version detection, etc.), optional |
 | `gdl/`              | The GDL toolchain (git submodule, pinned)          |
 | `tests/cache/`      | Cached Nexus archive manifests (gitignored)        |
 | `.gdl-out/`         | Generated TS + maps + tests (gitignored)           |
@@ -782,7 +782,7 @@ git commit -m "Add init scaffolder templates (game.yaml, package.json, ci.yml, g
 
 ---
 
-## Task 6: CLI — `gdl init <game-id>`
+## Task 6: CLI: `gdl init <game-id>`
 
 **Files:**
 - Create: `src/commands/init.ts`
@@ -1063,7 +1063,7 @@ jobs:
 Visually verify indentation. If you have `yamllint` available, run it.
 
 Run: `pnpm test`
-Expected: still passing — no code references this file directly.
+Expected: still passing (no code references this file directly).
 
 - [ ] **Step 3: Commit**
 
@@ -1074,10 +1074,10 @@ git commit -m "Add reusable release workflow (Nexus-Mods/upload-action + GH Rele
 
 ---
 
-## Task 8: E2E — `gdl package` against a real fixture
+## Task 8: E2E: `gdl package` against a real fixture
 
 **Files:**
-- Modify: `tests/fixtures/e2e/game.yaml` — add nexus block
+- Modify: `tests/fixtures/e2e/game.yaml` (add nexus block)
 - Modify: `tests/e2e.test.ts`
 
 Verify the full `gdl package` path produces a valid zip in `out/`.
@@ -1216,21 +1216,21 @@ git commit -m "Test: a freshly-init'd extension is sparse and still builds end-t
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all suites pass
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js with `build`, `test:corpus`, `package`, `publish-info`, `init`
+- [ ] `pnpm test` (all suites pass)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js with `build`, `test:corpus`, `package`, `publish-info`, `init`)
 - [ ] `dist/templates/` exists after build (init won't work without it)
 - [ ] `node dist/cli.js publish-info file-group-id` works in a fixture dir
 - [ ] `.github/workflows/release.yml` references `Nexus-Mods/upload-action@main` and reads metadata via `publish-info`
-- [ ] An extension repo's `ci.yml` (templated) is two `uses:` blocks — no per-extension config
+- [ ] An extension repo's `ci.yml` (templated) is two `uses:` blocks (no per-extension config)
 
 ---
 
 ## What this plan does not deliver (and where it goes)
 
-- **Actual Nexus uploads** — by design. The workflow is wired but only fires on a `v*` tag push. No tag is pushed by this plan or by any test.
+- **Actual Nexus uploads**: by design. The workflow is wired but only fires on a `v*` tag push. No tag is pushed by this plan or by any test.
 - **Real `game-subnautica2` port + diff against the legacy bundle** → Plan 5.
-- **`gdl publish` as a standalone CLI verb** — replaced by `publish-info` + the published `Nexus-Mods/upload-action`. If a local-publish flow is needed in the future (manual release without GH Actions), add a thin `gdl publish` that shells out to a small Nexus upload script. Plan 4 deliberately does not include this.
-- **Windows-friendly `build` script** — currently uses `cp -r src/templates dist/templates`. Replace with a Node script if a Windows GDL-developer workflow becomes necessary.
+- **`gdl publish` as a standalone CLI verb**: replaced by `publish-info` + the published `Nexus-Mods/upload-action`. If a local-publish flow is needed in the future (manual release without GH Actions), add a thin `gdl publish` that shells out to a small Nexus upload script. Plan 4 deliberately does not include this.
+- **Windows-friendly `build` script**: currently uses `cp -r src/templates dist/templates`. Replace with a Node script if a Windows GDL-developer workflow becomes necessary.
 - **Full structural signature matching for hooks** (carryover debt from Plan 2).
 - **Live mod-id enumeration for the corpus runner** (carryover debt from Plan 3).

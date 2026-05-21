@@ -2,11 +2,11 @@
 
 ## 1. The problem
 
-Vortex game extensions are TypeScript modules: each declares a game, its installers, its mod types, its tools, its load order, and so on by importing the Vortex API and writing code. Surveying real extensions (`~/oss/Vortex/extensions/games/`, `github.com/Nexus-Mods/game-subnautica2`) shows that roughly 90% of that code is restating the same handful of data shapes — store IDs, paths, glob-shaped installer rules, stop patterns — and the remaining 10% is small, predictable pieces of logic (version detection, custom destination computation) that vary per game.
+Vortex game extensions are TypeScript modules: each declares a game, its installers, its mod types, its tools, its load order, and so on by importing the Vortex API and writing code. Surveying real extensions (`~/oss/Vortex/extensions/games/`, `github.com/Nexus-Mods/game-subnautica2`) shows that roughly 90% of that code is restating the same handful of data shapes (store IDs, paths, glob-shaped installer rules, stop patterns) and the remaining 10% is small, predictable pieces of logic (version detection, custom destination computation) that vary per game.
 
 `GameAdaptorDesign.md` proposes a long-term Vortex change: sandboxed adaptors talking to the host over typed RPC. That work is its own project on its own timeline. This document describes a **near-term, tooling-only** answer to the same observation. We change nothing in Vortex. We get the data-format leverage by introducing a build-time language above today's extension API.
 
-The result: an extension is, in the perfect case, a single `game.yaml`. In practice it is `game.yaml` plus a small `src/hooks.ts`. Everything else — webpack, info.json generation, Vortex API wiring, test harness, packaging, Nexus upload, GitHub Actions — lives in a shared submodule that each extension repo pins by commit.
+The result: an extension is, in the perfect case, a single `game.yaml`. In practice it is `game.yaml` plus a small `src/hooks.ts`. Everything else (webpack, info.json generation, Vortex API wiring, test harness, packaging, Nexus upload, GitHub Actions) lives in a shared submodule that each extension repo pins by commit.
 
 ## 2. System overview
 
@@ -16,7 +16,7 @@ The GDL is a build-time toolchain, not a runtime. No YAML reaches the JS bundle 
 
 **An extension repo** (e.g. `game-subnautica2-gdl`) holds: one `game.yaml`, optionally a `src/hooks.ts` for any logic the YAML can't express, a `package.json` whose scripts delegate to the submodule CLI, and `gdl/` as a git submodule at a pinned commit. In the perfect case the repo contains nothing else.
 
-**The built bundle** is `dist/extension.js` plus `dist/info.json` plus declared assets — identical in shape to today's Vortex extensions. Vortex loads it unchanged.
+**The built bundle** is `dist/extension.js` plus `dist/info.json` plus declared assets, identical in shape to today's Vortex extensions. Vortex loads it unchanged.
 
 Build flow:
 
@@ -30,9 +30,9 @@ runtime-helpers (from submodule) ─────────────┘
 
 Three contracts pin the boundaries:
 
-- **YAML schema** — the surface the extension author sees. SemVer'd. Breaking changes bump major.
-- **Hook signatures** — typed function shapes the YAML can refer to. Each hook ID in the schema has exactly one signature.
-- **Runtime helper API** — the only thing the generated code calls. Stable across schema versions; the helper library absorbs `vortex-api` churn, not the codegen.
+- **YAML schema**: the surface the extension author sees. SemVer'd. Breaking changes bump major.
+- **Hook signatures**: typed function shapes the YAML can refer to. Each hook ID in the schema has exactly one signature.
+- **Runtime helper API**: the only thing the generated code calls. Stable across schema versions; the helper library absorbs `vortex-api` churn, not the codegen.
 
 Pinning the submodule by commit gives every extension a reproducible build. Bumping the submodule is a deliberate act, and the workflows referenced from the submodule are pinned at the same commit, so codegen and CI cannot drift.
 
@@ -42,9 +42,9 @@ The YAML has four layers: **declarations** (game, stores, mod types, installers,
 
 ### 3.1 Declarations
 
-Top-level keys are plain data, not conditional. `game` (id, name, executable, logo, required files, contributor), `stores` (per-store identifier — one value per store, type defaulted from the store), `modTypes` (id, display name, install path template), `installers` (ordered list, described below), `tools`, `loadOrder` (format + serialization target + per-item rules), `prelaunch` (commands + predicates), `diagnostics` (named checks).
+Top-level keys are plain data, not conditional. `game` (id, name, executable, logo, required files, contributor), `stores` (per-store identifier; one value per store, type defaulted from the store), `modTypes` (id, display name, install path template), `installers` (ordered list, described below), `tools`, `loadOrder` (format + serialization target + per-item rules), `prelaunch` (commands + predicates), `diagnostics` (named checks).
 
-Stores are flat by default — each store has one canonical identifier type and the schema knows which:
+Stores are flat by default: each store has one canonical identifier type and the schema knows which:
 
 ```yaml
 stores:
@@ -61,13 +61,13 @@ Built-in variables are always present: `store`, `os`, `arch`, `installPath`, `ex
 
 ### 3.3 Evaluation tags
 
-A small fixed set of object-form constructs (all written as plain YAML mappings — no `!tags`):
+A small fixed set of object-form constructs (all written as plain YAML mappings; no `!tags`):
 
-- `{ hook: <id> }` — reference to a typed function in `src/hooks.ts`. The schema declares the expected signature per hook ID.
-- `storeBranch:`, `osBranch:`, `versionBranch:` — keyed-by-fact dispatch with a required `default` arm. Arms can themselves be nested objects or interpolated strings, so branches compose.
-- `any: [...]` / `all: [...]` / `not: <p>` — boolean predicate combinators. Equality (`==`, `!=`), membership (`in`), and version comparators (`>=`, `<`) are available. The language is deliberately small; anything richer goes through `{ hook: <id> }`.
-- `{ hasFile: "<glob>" }`, `{ hasFiles: [...] }`, `{ matches: "<regex>" }` — pattern predicates for installer match blocks and diagnostics.
-- `{ path: [<segments…>] }` — composes paths from segments with OS-aware separators.
+- `{ hook: <id> }`: reference to a typed function in `src/hooks.ts`. The schema declares the expected signature per hook ID.
+- `storeBranch:`, `osBranch:`, `versionBranch:`: keyed-by-fact dispatch with a required `default` arm. Arms can themselves be nested objects or interpolated strings, so branches compose.
+- `any: [...]` / `all: [...]` / `not: <p>`: boolean predicate combinators. Equality (`==`, `!=`), membership (`in`), and version comparators (`>=`, `<`) are available. The language is deliberately small; anything richer goes through `{ hook: <id> }`.
+- `{ hasFile: "<glob>" }`, `{ hasFiles: [...] }`, `{ matches: "<regex>" }`: pattern predicates for installer match blocks and diagnostics.
+- `{ path: [<segments…>] }`: composes paths from segments with OS-aware separators.
 
 The expression surface is open: schema minors can add new object forms without restructuring the codegen, which is how it grows in response to real needs (Section 10).
 
@@ -77,7 +77,7 @@ Inside any string scalar, `${name}` substitutes from the resolved context. The c
 
 ### 3.5 Pattern syntax
 
-Globs are the primary form (`**`, `*`, `?`, `[…]`, `{a,b}`), matched against POSIX-form paths inside an archive's manifest or against the deployed file tree. Regex is available via `{ matches: "..." }`. The same matcher implementation backs every match site — `{ hasFile: "..." }` predicates, installer anchors, route match clauses, diagnostic queries.
+Globs are the primary form (`**`, `*`, `?`, `[…]`, `{a,b}`), matched against POSIX-form paths inside an archive's manifest or against the deployed file tree. Regex is available via `{ matches: "..." }`. The same matcher implementation backs every match site: `{ hasFile: "..." }` predicates, installer anchors, route match clauses, diagnostic queries.
 
 ### 3.6 Installers
 
@@ -190,12 +190,12 @@ nexus:
 
 **Phase 5: Emission.** Files are written to `.gdl-out/` (git-ignored):
 
-- `extension.ts` — the entry point Vortex loads. Calls into the runtime helper to register the game, mod types, installers, tools, diagnostics, and load order.
-- `context.ts` — the `GameContext` interface plus the resolver that fills it at discovery time.
-- `installers.ts` — each rule compiled to a named function pair: `testSupported(files, ctx)` and `install(files, ctx)`. Both call into the runtime helpers.
-- `diagnostics.ts` — one function per declared check.
-- `tests.gen.ts` — Vitest cases derived from any inline `tests.cases:` entries.
-- `info.json` — Vortex's extension manifest, derived from `game:` plus the extension's `package.json#version`.
+- `extension.ts`: the entry point Vortex loads. Calls into the runtime helper to register the game, mod types, installers, tools, diagnostics, and load order.
+- `context.ts`: the `GameContext` interface plus the resolver that fills it at discovery time.
+- `installers.ts`: each rule compiled to a named function pair: `testSupported(files, ctx)` and `install(files, ctx)`. Both call into the runtime helpers.
+- `diagnostics.ts`: one function per declared check.
+- `tests.gen.ts`: Vitest cases derived from any inline `tests.cases:` entries.
+- `info.json`: Vortex's extension manifest, derived from `game:` plus the extension's `package.json#version`.
 
 Every emitted file carries a "do not edit" banner naming its source. Output is byte-for-byte deterministic for a given input.
 
@@ -217,9 +217,9 @@ The helper library is the only dependency the generated code has besides `vortex
 
 **Interpolator.** `${var}` substitution against the resolved context, plus the `!path` segment joiner with OS-aware separators.
 
-**Installer engine.** Pure-function core: anchor pattern + `take:` strategy + `placeAt:` template + archive file list → install plan as a list of `{source, destination, type}` triples. The `route:` form is the same engine called once per route. No I/O, no Vortex calls — which makes it the natural target for the inline `tests:` fixtures.
+**Installer engine.** Pure-function core: anchor pattern + `take:` strategy + `placeAt:` template + archive file list → install plan as a list of `{source, destination, type}` triples. The `route:` form is the same engine called once per route. No I/O, no Vortex calls, which makes it the natural target for the inline `tests:` fixtures.
 
-**Predicate primitives.** Semver compare, equality, membership. Boolean combinators (`any:`/`all:`/`not:`) are *not* helpers — the codegen emits them inline as `||` / `&&` / `!` so the stack frame stays at the rule the author wrote.
+**Predicate primitives.** Semver compare, equality, membership. Boolean combinators (`any:`/`all:`/`not:`) are not helpers; the codegen emits them inline as `||` / `&&` / `!` so the stack frame stays at the rule the author wrote.
 
 **Vortex API shim.** The most strategically important piece. Presents a stable typed surface (`registerGame`, `registerInstaller`, `registerModType`, `registerTool`, `registerLoadOrder`, `addPrelaunchHook`, `addDiagnostic`, mediated file reads, deployed-tree queries, prelaunch-write commands) and translates each call to the corresponding `vortex-api` call. When `vortex-api` changes shape, the change is absorbed in the shim and never reaches generated code.
 
@@ -233,7 +233,7 @@ What the library is not: not a runtime YAML interpreter; not a Vortex API replac
 
 Three test paths, all running through the same installer engine the production extension calls.
 
-**Inline cases.** `tests.cases:` in `game.yaml` declares synthetic archives — a list of paths plus optional file contents — and the expected outcome (matched installer, install plan, mod type). The codegen emits one Vitest case per entry. These run on every `pnpm test`, finish in milliseconds, and document the rule they sit next to. When a rule changes the cases that pin it move with it.
+**Inline cases.** `tests.cases:` in `game.yaml` declares synthetic archives (a list of paths plus optional file contents) and the expected outcome (matched installer, install plan, mod type). The codegen emits one Vitest case per entry. These run on every `pnpm test`, finish in milliseconds, and document the rule they sit next to. When a rule changes the cases that pin it move with it.
 
 Authors can also write hand-rolled `*.test.ts` files alongside `src/hooks.ts` for cases the inline form cannot express. These import the helper library and the generated installer functions directly.
 
@@ -247,7 +247,7 @@ This is the same mechanism the Vortex repo's `packages/game-extension-test` harn
 
 ## 7. Release pipeline
 
-The release flow mirrors today's `game-subnautica2` flow — webpack a bundle, package as `.vortex-extension`, upload to Nexus — but every step is owned by the submodule CLI.
+The release flow mirrors today's `game-subnautica2` flow (webpack a bundle, package as `.vortex-extension`, upload to Nexus), but every step is owned by the submodule CLI.
 
 **Versioning.** The extension version lives in `package.json`. The codegen reads it and writes it into `info.json`. One source of truth; no version in `game.yaml`.
 
@@ -255,16 +255,16 @@ The release flow mirrors today's `game-subnautica2` flow — webpack a bundle, p
 
 **Three CLI verbs:**
 
-- `gdl build` — codegen plus webpack. Produces `dist/extension.js`, `dist/info.json`, and declared assets.
-- `gdl package` — runs `gdl build`, then zips `dist/` into `dist/<id>-<version>.vortex-extension`.
-- `gdl publish` — runs `gdl package`, then uploads to Nexus. Reads `NEXUS_API_KEY` and the extension's `game.yaml#nexus.modId`. Refuses to overwrite an existing version unless `--force` is passed. Posts release notes from `CHANGELOG.md` (top section) or the annotated tag's message.
+- `gdl build`: codegen plus webpack. Produces `dist/extension.js`, `dist/info.json`, and declared assets.
+- `gdl package`: runs `gdl build`, then zips `dist/` into `dist/<id>-<version>.vortex-extension`.
+- `gdl publish`: runs `gdl package`, then uploads to Nexus. Reads `NEXUS_API_KEY` and the extension's `game.yaml#nexus.modId`. Refuses to overwrite an existing version unless `--force` is passed. Posts release notes from `CHANGELOG.md` (top section) or the annotated tag's message.
 
 `gdl publish --dry-run` runs everything except the final POST.
 
 **Reusable workflows in `gdl/.github/workflows/`:**
 
-- `test.yml` — checkout, install, `gdl build`, `pnpm test`. Caches `tests/cache/`.
-- `release.yml` — depends on `test.yml`, then `gdl publish`, then creates a GitHub Release with the `.vortex-extension` attached as a release asset.
+- `test.yml`: checkout, install, `gdl build`, `pnpm test`. Caches `tests/cache/`.
+- `release.yml`: depends on `test.yml`, then `gdl publish`, then creates a GitHub Release with the `.vortex-extension` attached as a release asset.
 
 An extension's CI is one file:
 
@@ -328,7 +328,7 @@ Stated explicitly so they do not creep in during implementation.
 - **Not the Worker-sandbox adaptor design from `GameAdaptorDesign.md`.** That is a future Vortex change. This project is tooling on top of today's API.
 - **Not a runtime YAML interpreter.** No YAML reaches the bundle.
 - **Not for general-purpose extensions.** Theming, utility panels, integrations stay on the regular extension surface. The GDL handles game support only.
-- **Minimal expression surface in v1.** The predicate language starts small (equality, version comparators, membership, boolean combinators). More complex constructs — string ops, arithmetic, computed paths, lookup tables — are added in later schema minors when a concrete use case forces the question. The growth path is more typed object-form constructs with declared schemas, not embedded code in strings. `{ hook: <id> }` remains the escape hatch for anything the schema does not yet express. The expression surface is open by design: adding a new object form does not require restructuring the build.
+- **Minimal expression surface in v1.** The predicate language starts small (equality, version comparators, membership, boolean combinators). More complex constructs (string ops, arithmetic, computed paths, lookup tables) are added in later schema minors when a concrete use case forces the question. The growth path is more typed object-form constructs with declared schemas, not embedded code in strings. `{ hook: <id> }` remains the escape hatch for anything the schema does not yet express. The expression surface is open by design: adding a new object form does not require restructuring the build.
 - **No automatic migration of existing extensions** in v1.
 - **No Nexus mod-page management.** The author creates the mod page once and records its ID in `game.yaml#nexus.modId`. `gdl publish` uploads versions; it does not create pages.
 - **No web UI** for browsing or editing extensions. JSON Schema plus IDE integration is enough.
@@ -340,17 +340,17 @@ Re-author `game-subnautica2` as `game-subnautica2-gdl` using the GDL.
 
 The acceptance criterion is concrete: take the corpus of mods that the existing extension handles correctly today, feed each through both the legacy extension and the GDL-built extension, and assert byte-for-byte equality of the install plans. Any divergence is either a schema gap (file an issue, extend a tag, port again) or a bug in the legacy extension (acceptable; the GDL version supersedes).
 
-Re-authoring subnautica2 — UE5/UE4SS with three mod types and multiple stores — exercises store branching, archive-content matching, anchor + take installers, the composite `route:` form, and a hook for version detection. It is a non-trivial real game; if the GDL covers it cleanly, the design is validated for the class.
+Re-authoring subnautica2 (UE5/UE4SS with three mod types and multiple stores) exercises store branching, archive-content matching, anchor + take installers, the composite `route:` form, and a hook for version detection. It is a non-trivial real game; if the GDL covers it cleanly, the design is validated for the class.
 
 ## 12. Glossary
 
-- **GDL** — Game Description Language. The YAML schema plus the tooling that turns it into a Vortex extension.
-- **Submodule** — the `game-description-language` repo, consumed by every extension repo at `gdl/` via `git submodule`.
-- **Extension repo** — a single-game repo containing `game.yaml` and optional `src/hooks.ts`, pinned to a submodule commit.
-- **Codegen** — `gdl build`; the build-time process that turns YAML into TypeScript.
-- **Helper library** — the small runtime that generated code calls into for matching, interpolation, plan construction, and Vortex registration.
-- **Hook** — a typed TypeScript function in `src/hooks.ts` referenced from YAML via `{ hook: <id> }`.
-- **Context** — the resolved, frozen object of named values that string interpolation, predicates, and branch objects read from at install or discovery time.
-- **Object form** — the GDL syntax for computed values and predicates: plain YAML mappings such as `{ hasFile: "..." }`, `{ hook: <id> }`, `storeBranch: { ... }`. Replaces the earlier tag-form syntax (`!hasFile`, `!hook`, etc.) which is no longer accepted by the parser.
-- **Corpus** — the set of archives a test run exercises an extension against, optionally pulled from Nexus.
-- **Shim** — the small typed surface between generated code and `vortex-api`; absorbs upstream churn.
+- **GDL**: Game Description Language. The YAML schema plus the tooling that turns it into a Vortex extension.
+- **Submodule**: the `game-description-language` repo, consumed by every extension repo at `gdl/` via `git submodule`.
+- **Extension repo**: a single-game repo containing `game.yaml` and optional `src/hooks.ts`, pinned to a submodule commit.
+- **Codegen**: `gdl build`; the build-time process that turns YAML into TypeScript.
+- **Helper library**: the small runtime that generated code calls into for matching, interpolation, plan construction, and Vortex registration.
+- **Hook**: a typed TypeScript function in `src/hooks.ts` referenced from YAML via `{ hook: <id> }`.
+- **Context**: the resolved, frozen object of named values that string interpolation, predicates, and branch objects read from at install or discovery time.
+- **Object form**: the GDL syntax for computed values and predicates: plain YAML mappings such as `{ hasFile: "..." }`, `{ hook: <id> }`, `storeBranch: { ... }`. Replaces the earlier tag-form syntax (`!hasFile`, `!hook`, etc.) which is no longer accepted by the parser.
+- **Corpus**: the set of archives a test run exercises an extension against, optionally pulled from Nexus.
+- **Shim**: the small typed surface between generated code and `vortex-api`; absorbs upstream churn.

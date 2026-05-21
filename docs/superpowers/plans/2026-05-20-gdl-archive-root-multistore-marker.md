@@ -1,4 +1,4 @@
-# GDL — `archive-root` Take + Multi-Store Discover + Marker Fix Implementation Plan
+# GDL: `archive-root` Take + Multi-Store Discover + Marker Fix Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -38,7 +38,7 @@ game-description-language/
 
 ---
 
-## Task 1: AST + parser — `take: archive-root`
+## Task 1: AST + parser: `take: archive-root`
 
 **Files:**
 - Modify: `src/parser/ast.ts`
@@ -91,7 +91,7 @@ installers:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — `parseTakeStrategy` rejects `archive-root`.
+Expected: FAIL (`parseTakeStrategy` rejects `archive-root`).
 
 - [ ] **Step 3: Extend `parseTakeStrategy` in `src/parser/index.ts`**
 
@@ -149,7 +149,7 @@ git commit -m "Add 'archive-root' take strategy to AST and parser"
 
 ---
 
-## Task 2: Runtime engine — `take: archive-root` keeps paths as-is
+## Task 2: Runtime engine: `take: archive-root` keeps paths as-is
 
 **Files:**
 - Modify: `src/runtime/installer-engine.ts`
@@ -271,7 +271,7 @@ git commit -m "Engine: take 'archive-root' keeps the archive path as-is in the d
 
 ---
 
-## Task 3: Codegen — emit `take: archive-root`
+## Task 3: Codegen: emit `take: archive-root`
 
 **Files:**
 - Modify: `src/codegen/emit.ts`
@@ -290,7 +290,7 @@ const renderTake = (t: TakeStrategy): string => {
 };
 ```
 
-The `typeof t === 'string'` branch already handles any string variant via `sq()` — including the new `'archive-root'`. **No code change required.** But add a test to pin the behavior.
+The `typeof t === 'string'` branch already handles any string variant via `sq()` (including the new `'archive-root'`). **No code change required.** But add a test to pin the behavior.
 
 - [ ] **Step 2: Failing-then-passing test in `tests/codegen.test.ts`**
 
@@ -344,7 +344,7 @@ git commit -m "Codegen: regression test that take: archive-root emits correctly"
 
 ---
 
-## Task 4: Vortex shim — pass all appIds in one `findByAppId` call
+## Task 4: Vortex shim: pass all appIds in one `findByAppId` call
 
 **Files:**
 - Modify: `src/runtime/vortex-shim.ts`
@@ -402,12 +402,12 @@ In `src/runtime/vortex-shim.ts`, find:
   }
 ```
 
-The signature change: pass `appIds` (`string[]`) instead of one `appId` + `storeId`. Vortex's `findByAppId` already accepts `string | string[]` — we declared that in the d.ts in Plan 2.
+The signature change: pass `appIds` (`string[]`) instead of one `appId` + `storeId`. Vortex's `findByAppId` already accepts `string | string[]`; we declared that in the d.ts in Plan 2.
 
 - [ ] **Step 3: Tests and typecheck**
 
 Run: `pnpm test`
-Expected: 124 tests still pass. No test exercises `discover` directly (it's called lazily during `queryPath`, which the e2e bundle doesn't actually run — only string-asserts).
+Expected: 124 tests still pass. No test exercises `discover` directly (it's called lazily during `queryPath`, which the e2e bundle doesn't actually run; only string-asserts).
 
 Run: `pnpm typecheck`
 Expected: exits 0.
@@ -421,7 +421,7 @@ git commit -m "Shim: discover passes all store appIds in one findByAppId call"
 
 ---
 
-## Task 5: subnautica2-shaped fixture — root installer, dual ue4ss-lua
+## Task 5: subnautica2-shaped fixture: root installer, dual ue4ss-lua
 
 **Files:**
 - Modify: `tests/fixtures/subnautica2-shaped/game.yaml`
@@ -543,15 +543,15 @@ Find the subnautica2-shaped describe block. After the existing assertions add:
 - [ ] **Step 4: Run tests**
 
 Run: `pnpm test e2e`
-Expected: PASS — the subnautica2-shaped test now also asserts the new fixture content.
+Expected: PASS (the subnautica2-shaped test now also asserts the new fixture content).
 
 Run: `pnpm test`
-Expected: 124 tests still pass (no new `it` block — the assertions extend an existing one).
+Expected: 124 tests still pass (no new `it` block; the assertions extend an existing one).
 
 Run: `pnpm typecheck`
 Expected: exits 0.
 
-> **Heads-up:** the existing `'ue4ss lua mod'` test case in the fixture (the one added in Plan 2) only asserts `matched: ue4ss-lua` and `modType: ue4ss-lua` — not the plan. After this task, that case's plan changes from `${ue4ssModsRoot}/Scripts/main.lua` to `${ue4ssModsRoot}/MyLuaMod/Scripts/main.lua` (because the new file-anchor + take=parent.parent preserves the mod-name). The unchanged assertions still pass. The two new test cases (above, with explicit `plan:`) pin the new behavior.
+> **Heads-up:** the existing `'ue4ss lua mod'` test case in the fixture (the one added in Plan 2) only asserts `matched: ue4ss-lua` and `modType: ue4ss-lua` (not the plan). After this task, that case's plan changes from `${ue4ssModsRoot}/Scripts/main.lua` to `${ue4ssModsRoot}/MyLuaMod/Scripts/main.lua` (because the new file-anchor + take=parent.parent preserves the mod-name). The unchanged assertions still pass. The two new test cases (above, with explicit `plan:`) pin the new behavior.
 
 - [ ] **Step 5: Commit**
 
@@ -649,9 +649,9 @@ git commit -m "Close gaps #1 (marker), #2 (root), #5 (multi-store) — implement
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all 124 tests pass
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js
+- [ ] `pnpm test` (124 tests pass)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js)
 - [ ] The subnautica2-shaped fixture's bundle contains `'root'`, `'ue4ss-lua-enabled'`, and `archive-root`
 - [ ] `docs/superpowers/gaps.md` has 4 open items left (lifecycle hooks ×2, discovery ×1, mod types ×1)
 
@@ -665,10 +665,10 @@ Once Plan 9 lands, bump the subnautica2 port's GDL submodule and mirror the fixt
 3. Add the `ue4ss-lua-enabled` installer.
 4. Update the port's `GAPS.md` to remove items 1 / 2 / 5 / 6 (renumbered).
 
-Small follow-up — same pattern as Plans 6, 7, 8.
+Small follow-up; same pattern as Plans 6, 7, 8.
 
 ## What this plan does not deliver (and where it goes)
 
-- **`take: preserve-mod-root` strategy** — a stricter version of the marker-find-then-walk-up logic that respects the mod-name directory as the install-root for scoping. Not needed for the common archive shapes; add when a real game requires it.
-- **Per-store fallback rules inside the single `findByAppId` call** — Vortex's array-form handles this internally. We accept whatever its preference order is.
-- **`take: archive-root` in route entries** — the new variant works there too (it's just a `TakeStrategy`), but no test exercises it. Add a test if a real game uses it.
+- **`take: preserve-mod-root` strategy**: a stricter version of the marker-find-then-walk-up logic that respects the mod-name directory as the install-root for scoping. Not needed for the common archive shapes; add when a real game requires it.
+- **Per-store fallback rules inside the single `findByAppId` call**: Vortex's array-form handles this internally. We accept whatever its preference order is.
+- **`take: archive-root` in route entries**: the new variant works there too (it's just a `TakeStrategy`), but no test exercises it. Add a test if a real game uses it.

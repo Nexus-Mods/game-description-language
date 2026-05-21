@@ -2,10 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the remaining two gaps in `docs/superpowers/gaps.md`: (1) installer-side arch handling — via a new `scope.stores: [...]` field that restricts an installer to specific stores, useful when a future game ships different markers per arch; (2) per-instance `getPath` re-evaluation — the shim's modType getPath callback re-interpolates the path template on each call using the current game's `gamePath`, so re-discovery after a path change is reflected.
+**Goal:** Close the remaining two gaps in `docs/superpowers/gaps.md`: (1) installer-side arch handling, via a new `scope.stores: [...]` field that restricts an installer to specific stores, useful when a future game ships different markers per arch; (2) per-instance `getPath` re-evaluation, where the shim's modType getPath callback re-interpolates the path template on each call using the current game's `gamePath`, so re-discovery after a path change is reflected.
 
 **Architecture:** Two independent additions, both small:
-1. **`scope.stores`** is an optional array on installer rules. AST/parser accept it; the shim's installer dispatcher checks the current store against the scope before consulting the engine. The engine itself is unchanged — store-scoping is a game-state filter, not an archive-content filter.
+1. **`scope.stores`** is an optional array on installer rules. AST/parser accept it; the shim's installer dispatcher checks the current store against the scope before consulting the engine. The engine itself is unchanged; store-scoping is a game-state filter, not an archive-content filter.
 2. **Lazy modType `getPath`** changes the shim from "compute path once at registerModType" to "compute on every call." The callback that Vortex invokes captures the path template (not the resolved string) and re-interpolates against a context that overrides `installPath` with the current game's `gamePath`.
 
 **Tech Stack:** Existing stack. No new dependencies.
@@ -38,7 +38,7 @@ game-description-language/
 
 ---
 
-## Task 1: AST + parser — `scope: { stores: [...] }` on installer rules
+## Task 1: AST + parser: `scope: { stores: [...] }` on installer rules
 
 **Files:**
 - Modify: `src/parser/ast.ts`
@@ -139,7 +139,7 @@ installers:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — `inst.scope` undefined in the first case.
+Expected: FAIL (`inst.scope` undefined in the first case).
 
 - [ ] **Step 3: Extend `src/parser/index.ts`**
 
@@ -214,7 +214,7 @@ git commit -m "Parse installer scope.stores (per-store installer scoping)"
 
 ---
 
-## Task 2: Runtime + shim — filter installers by scope.stores
+## Task 2: Runtime + shim: filter installers by scope.stores
 
 **Files:**
 - Modify: `src/runtime/installer-engine.ts`
@@ -254,7 +254,7 @@ export interface InstallerRule {
 }
 ```
 
-No engine logic changes — `scope` is data-only here, the shim consumes it.
+No engine logic changes; `scope` is data-only here, the shim consumes it.
 
 - [ ] **Step 2: Failing test in the shim**
 
@@ -330,10 +330,10 @@ describe('GdlRuntime — installer scope.stores filtering', () => {
 });
 ```
 
-> **Note:** the test calls `runtime.setDiscoveredStore(...)` and `runtime.registerInstallerRulePublic(...)`. These are test-only seams. The shim already has `registerInstallerRule` as a private method (see Task 2 of Plan 7). We need to expose a public version of it (or test via the full registerGame flow). The simplest path: add a test-only public method `registerInstallerRulePublic` that wraps the private one, or remove `private` and rely on convention. Pick whatever's least invasive. Same for `setDiscoveredStore` — we need a way to set the current store from tests; add a public setter or accept it as a registerGame arg.
+> **Note:** the test calls `runtime.setDiscoveredStore(...)` and `runtime.registerInstallerRulePublic(...)`. These are test-only seams. The shim already has `registerInstallerRule` as a private method (see Task 2 of Plan 7). We need to expose a public version of it (or test via the full registerGame flow). The simplest path: add a test-only public method `registerInstallerRulePublic` that wraps the private one, or remove `private` and rely on convention. Pick whatever's least invasive. Same for `setDiscoveredStore`; we need a way to set the current store from tests; add a public setter or accept it as a registerGame arg.
 
 Run: `pnpm test vortex-shim`
-Expected: FAIL — methods don't exist yet.
+Expected: FAIL (methods don't exist yet).
 
 - [ ] **Step 3: Update the shim**
 
@@ -412,7 +412,7 @@ git commit -m "Shim: filter installers by scope.stores against the discovered st
 
 ---
 
-## Task 3: Codegen — emit `scope` on installer rules
+## Task 3: Codegen: emit `scope` on installer rules
 
 **Files:**
 - Modify: `src/codegen/emit.ts`
@@ -514,7 +514,7 @@ git commit -m "Codegen: emit scope.stores on installer rules when present"
 
 ---
 
-## Task 4: Shim — lazy modType `getPath`
+## Task 4: Shim: lazy modType `getPath`
 
 **Files:**
 - Modify: `src/runtime/vortex-shim.ts`
@@ -558,7 +558,7 @@ describe('GdlRuntime — lazy modType getPath', () => {
 > **Note:** uses `setResolvedCtxForTesting` and `registerModTypePublic` as test-only seams. Add them like the ones from Task 2. The signature of `registerModTypePublic` should match the args used by the shim internally to register a modType.
 
 Run: `pnpm test vortex-shim`
-Expected: FAIL — `getPath` returns the value computed at registration time (doesn't pick up the new gamePath).
+Expected: FAIL (`getPath` returns the value computed at registration time and doesn't pick up the new gamePath).
 
 - [ ] **Step 2: Change the modType registration to lazy in `src/runtime/vortex-shim.ts`**
 
@@ -651,13 +651,13 @@ git commit -m "Shim: modType getPath re-interpolates per call with current game.
 
 ---
 
-## Task 5: E2E — subnautica2-shaped fixture exercises scope
+## Task 5: E2E: subnautica2-shaped fixture exercises scope
 
 **Files:**
 - Modify: `tests/fixtures/subnautica2-shaped/game.yaml`
 - Modify: `tests/e2e.test.ts`
 
-Add a placeholder Xbox-scoped installer to demonstrate the scope feature flows through to the bundle. (No new test case for runtime — Task 2's unit tests cover that. This is just an end-to-end smoke test that the YAML + codegen + bundling work.)
+Add a placeholder Xbox-scoped installer to demonstrate the scope feature flows through to the bundle. (No new test case for runtime; Task 2's unit tests cover that. This is just an end-to-end smoke test that the YAML + codegen + bundling work.)
 
 - [ ] **Step 1: Modify `tests/fixtures/subnautica2-shaped/game.yaml`**
 
@@ -675,7 +675,7 @@ Add a placeholder installer at the bottom of the `installers:` list:
     modType: ue4ss-injector
 ```
 
-> **Reasoning:** This installer is conceptually "Xbox-only UE4SS injector" — fictional but demonstrates the syntax. When running on Steam/Epic, the shim's scope filter would skip it (lower priority than the generic `ue4ss-injector` at 15 means the generic one wins first anyway, but the scope filter still applies as a defense-in-depth).
+> **Reasoning:** This installer is conceptually "Xbox-only UE4SS injector" (fictional, but demonstrates the syntax). When running on Steam/Epic, the shim's scope filter would skip it (lower priority than the generic `ue4ss-injector` at 15 means the generic one wins first anyway, but the scope filter still applies as a defense-in-depth).
 
 - [ ] **Step 2: Extend the subnautica2-shaped e2e test**
 
@@ -760,9 +760,9 @@ git commit -m "Close last two gaps (Xbox arch scoping, lazy getPath) — impleme
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all 141 tests pass
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js
+- [ ] `pnpm test` (141 tests pass)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js)
 - [ ] The subnautica2-shaped fixture's bundle contains `xbox-injector-placeholder` and `scope: { stores: ['xbox'] }`
 - [ ] `docs/superpowers/gaps.md` has 0 open items
 
@@ -772,10 +772,10 @@ git commit -m "Close last two gaps (Xbox arch scoping, lazy getPath) — impleme
 
 Once Plan 11 lands, bump the subnautica2 port's GDL submodule. No new game.yaml changes are strictly required for subnautica2 (the markers are the same across arches), but the port author can opt-in to scope.stores if desired. Also bump the port's GAPS.md to remove the closed items.
 
-This is the LAST follow-up port update — after this, every gap surfaced by the subnautica2 port is closed and the port's GAPS.md is empty.
+This is the LAST follow-up port update; after this, every gap surfaced by the subnautica2 port is closed and the port's GAPS.md is empty.
 
 ## What this plan does not deliver (and where it goes)
 
-- **OS-scoped installers** (e.g., `scope: { os: [windows] }`) — same pattern as `stores`, but no real game has needed it yet. Add when there's a concrete use case.
-- **Dynamic discovery re-runs** — Vortex calls `getPath(game)` with the current game record, so we re-interpolate from that. We don't re-call `GameStoreHelper.findByAppId` on each getPath call (would be too expensive). If a game's discovery state mutates more deeply than just `gamePath`, a future revision can refresh the broader discovery facts (store, arch) too.
-- **Path template syntax beyond `${var}`** — installs use simple variable interpolation. If we ever need expressions (`${installPath}/${store === 'xbox' ? 'WinGDK' : 'Win64'}`), that's a meaningful extension; `!storeBranch` covers the current cases.
+- **OS-scoped installers** (e.g., `scope: { os: [windows] }`): same pattern as `stores`, but no real game has needed it yet. Add when there's a concrete use case.
+- **Dynamic discovery re-runs**: Vortex calls `getPath(game)` with the current game record, so we re-interpolate from that. We don't re-call `GameStoreHelper.findByAppId` on each getPath call (would be too expensive). If a game's discovery state mutates more deeply than just `gamePath`, a future revision can refresh the broader discovery facts (store, arch) too.
+- **Path template syntax beyond `${var}`**: installs use simple variable interpolation. If we ever need expressions (`${installPath}/${store === 'xbox' ? 'WinGDK' : 'Win64'}`), that's a meaningful extension; `!storeBranch` covers the current cases.

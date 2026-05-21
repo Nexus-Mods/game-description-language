@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close gap #1 from `docs/superpowers/gaps.md` — add an optional `unless:` predicate to installer rules so a broad fallback installer can disqualify itself when archive contents would also match a narrower installer. The legacy Vortex pattern this replaces is `losesTo: [predicateFn, ...]`, expressed in GDL as a single composable predicate (`!any` / `!all` of `!hasFile` / `!matches`, etc.).
+**Goal:** Close gap #1 from `docs/superpowers/gaps.md`: add an optional `unless:` predicate to installer rules so a broad fallback installer can disqualify itself when archive contents would also match a narrower installer. The legacy Vortex pattern this replaces is `losesTo: [predicateFn, ...]`, expressed in GDL as a single composable predicate (`!any` / `!all` of `!hasFile` / `!matches`, etc.).
 
-**Architecture:** Tiny extension of the existing installer/predicate machinery. `InstallerNode` gets an optional `unless?: PredicateNode`. The parser reads it from the YAML; the validator needs no new rules (predicates are already structurally typed via the existing tag set); the runtime installer engine adds one short-circuit line — `if unless evaluates true, return []`; the codegen emits the field; one E2E fixture covers all installer combinations that now become expressible.
+**Architecture:** Tiny extension of the existing installer/predicate machinery. `InstallerNode` gets an optional `unless?: PredicateNode`. The parser reads it from the YAML; the validator needs no new rules (predicates are already structurally typed via the existing tag set); the runtime installer engine adds one short-circuit line (`if unless evaluates true, return []`); the codegen emits the field; one E2E fixture covers all installer combinations that now become expressible.
 
 **Tech Stack:** Existing Plans 1-6 stack. No new dependencies.
 
@@ -33,11 +33,11 @@ game-description-language/
         └── subnautica2-shaped/game.yaml   # +unless on broader installers
 ```
 
-The route form of an installer doesn't need its own `unless` — at the rule level is sufficient. A rule's `unless` gates the whole rule (both single and route forms).
+The route form of an installer doesn't need its own `unless`; the rule level is sufficient. A rule's `unless` gates the whole rule (both single and route forms).
 
 ---
 
-## Task 1: AST — `unless?: PredicateNode` on InstallerNode
+## Task 1: AST: `unless?: PredicateNode` on InstallerNode
 
 **Files:**
 - Modify: `src/parser/ast.ts`
@@ -92,7 +92,7 @@ git commit -m "Add optional unless predicate to InstallerNode"
 
 ---
 
-## Task 2: Parser — read `unless:` field on installer entries
+## Task 2: Parser: read `unless:` field on installer entries
 
 **Files:**
 - Modify: `src/parser/index.ts`
@@ -160,7 +160,7 @@ installers:
 ```
 
 Run: `pnpm test parser`
-Expected: FAIL — `inst.unless` undefined in the first case.
+Expected: FAIL (`inst.unless` undefined in the first case).
 
 - [ ] **Step 2: Extend `src/parser/index.ts`**
 
@@ -196,7 +196,7 @@ installers.push({
 - [ ] **Step 3: Run tests**
 
 Run: `pnpm test parser`
-Expected: PASS — both new cases.
+Expected: PASS (both new cases).
 
 Run: `pnpm test`
 Expected: 107 tests pass (105 + 2 new).
@@ -213,7 +213,7 @@ git commit -m "Parse optional unless predicate on installer rules"
 
 ---
 
-## Task 3: Runtime engine — short-circuit on `unless`
+## Task 3: Runtime engine: short-circuit on `unless`
 
 **Files:**
 - Modify: `src/runtime/installer-engine.ts`
@@ -293,7 +293,7 @@ describe('buildInstallPlan — unless predicate', () => {
 ```
 
 Run: `pnpm test installer-engine`
-Expected: FAIL (the new describe block) — `rule.unless` not in the type, runtime doesn't know about it.
+Expected: FAIL (the new describe block; `rule.unless` not in the type, runtime doesn't know about it).
 
 - [ ] **Step 2: Extend `InstallerRule` and `buildInstallPlan` in `src/runtime/installer-engine.ts`**
 
@@ -369,7 +369,7 @@ git commit -m "Runtime: skip installer when unless predicate evaluates true"
 
 ---
 
-## Task 4: Codegen — render `unless` in `renderInstaller`
+## Task 4: Codegen: render `unless` in `renderInstaller`
 
 **Files:**
 - Modify: `src/codegen/emit.ts`
@@ -502,13 +502,13 @@ git commit -m "Codegen: emit unless predicate on installer rules when present"
 
 ---
 
-## Task 5: E2E — subnautica2-shaped fixture exercises `unless`
+## Task 5: E2E: subnautica2-shaped fixture exercises `unless`
 
 **Files:**
 - Modify: `tests/fixtures/subnautica2-shaped/game.yaml`
 - Modify: `tests/e2e.test.ts`
 
-Currently the subnautica2-shaped fixture has 4 installers (pak, logic-mod, ue4ss-lua, composite-mod). Add `unless` to the `pak` installer so it doesn't claim archives that have LogicMods or UE4SS markers — mirroring how the real subnautica2 extension uses `losesTo`.
+Currently the subnautica2-shaped fixture has 4 installers (pak, logic-mod, ue4ss-lua, composite-mod). Add `unless` to the `pak` installer so it doesn't claim archives that have LogicMods or UE4SS markers, mirroring how the real subnautica2 extension uses `losesTo`.
 
 - [ ] **Step 1: Modify `tests/fixtures/subnautica2-shaped/game.yaml`**
 
@@ -559,7 +559,7 @@ Append two new test cases under `tests.cases:` that pin the `unless` behavior. *
 
 In the first case: the archive matches `pak`'s `when` (it has a `.pak`), but `pak`'s `unless: !any [...]` matches (it has `**/LogicMods/**`), so `pak` disqualifies itself. `logic-mod` (priority 20) is evaluated first anyway and wins.
 
-In the second case: archive has both `.pak` and `.lua`. `ue4ss-lua` (priority 10) matches first via its `when: !any [Scripts/*.lua, enabled.txt]` and wins before `pak` is even consulted. `unless` is correct insurance for the case where ue4ss-lua wouldn't have fired for some other reason — without it, `pak` could still claim the archive.
+In the second case: archive has both `.pak` and `.lua`. `ue4ss-lua` (priority 10) matches first via its `when: !any [Scripts/*.lua, enabled.txt]` and wins before `pak` is even consulted. `unless` is correct insurance for the case where ue4ss-lua wouldn't have fired for some other reason; without it, `pak` could still claim the archive.
 
 - [ ] **Step 2: Extend the subnautica2-shaped e2e test in `tests/e2e.test.ts`**
 
@@ -580,7 +580,7 @@ And one more assertion about the bundle containing `unless` somewhere (the runti
 - [ ] **Step 3: Run tests + verify generated tests pass**
 
 Run: `pnpm test e2e`
-Expected: PASS — all e2e cases plus the new bundle assertion.
+Expected: PASS (all e2e cases plus the new bundle assertion).
 
 Note: the `subnautica2-shaped` e2e test only builds the bundle and asserts string content. It does NOT separately run the generated tests file. The "generated tests run" e2e test (added in Plan 3 polish) uses the simpler `tests/fixtures/e2e/` fixture, not `subnautica2-shaped/`. So the new test cases we just added to subnautica2-shaped/ are exercised in the bundle (their strings appear in tests.gen.ts), but their actual runtime behavior is exercised by the unit tests in Task 3.
 
@@ -623,7 +623,7 @@ Add the closed entry under "## Closed":
    disqualifying itself when LogicMods or Scripts are present.
 ```
 
-Note: this also means the previously-Open item 4 ("`root` installer") is now expressible too — append a note to item 4 (now renumbered to 3 in Open) that it can be expressed using `unless`. Or, if the user later adds `root` to the subnautica2 port and confirms it works, item 3 (renumbered) can be closed too.
+Note: this also means the previously-Open item 4 ("`root` installer") is now expressible too; append a note to item 4 (now renumbered to 3 in Open) that it can be expressed using `unless`. Or, if the user later adds `root` to the subnautica2 port and confirms it works, item 3 (renumbered) can be closed too.
 
 For this plan: just close item 1, leave the renumbered item 3 (originally 4) open with a note like:
 
@@ -645,9 +645,9 @@ git commit -m "Close gap #1 (losesTo) — implemented as 'unless' in Plan 7"
 
 ## Self-review checklist (run after completing all tasks)
 
-- [ ] `pnpm test` — all 112 tests pass
-- [ ] `pnpm typecheck` — clean
-- [ ] `pnpm build` — produces dist/cli.js
+- [ ] `pnpm test` (112 tests pass)
+- [ ] `pnpm typecheck` (clean)
+- [ ] `pnpm build` (produces dist/cli.js)
 - [ ] The subnautica2-shaped fixture's bundle contains the `unless:` keyword (runtime form)
 - [ ] `docs/superpowers/gaps.md` has item 1 moved to Closed; remaining open items renumbered correctly
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 22, TypeScript 5.4, `yaml@2`, `vitest@3`, `webpack@5` + `ts-loader`, `commander@12` (CLI), `pnpm@11`. Vendored minimal `vortex-api` types for the shim; `vortex-api` itself is webpack-externalised.
 
-**Spec reference:** `docs/superpowers/specs/2026-05-20-game-description-language-design.md`, particularly §2 (overview), §3.1–3.5 (declarations, context, tags, interpolation), §4 (codegen pipeline phases), §5 (runtime helpers), and §10 (non-goals — installer support is explicitly out of scope here).
+**Spec reference:** `docs/superpowers/specs/2026-05-20-game-description-language-design.md`, particularly §2 (overview), §3.1–3.5 (declarations, context, tags, interpolation), §4 (codegen pipeline phases), §5 (runtime helpers), and §10 (non-goals; installer support is explicitly out of scope here).
 
 ---
 
@@ -74,7 +74,7 @@ game-description-language/
 - Create: `vitest.config.ts`
 - Create: `.gitignore`
 
-This task is setup, not TDD — there's nothing to test until we have code.
+This task is setup, not TDD; there's nothing to test until we have code.
 
 - [ ] **Step 1: Create `package.json`**
 
@@ -280,7 +280,7 @@ git commit -m "Add BuildError and AST node types"
 
 ---
 
-## Task 3: Parser — minimal YAML (gdl + game.id)
+## Task 3: Parser: minimal YAML (gdl + game.id)
 
 **Files:**
 - Create: `src/parser/index.ts`
@@ -334,7 +334,7 @@ describe('parseYaml', () => {
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `pnpm test parser`
-Expected: FAIL — `Cannot find module '../src/parser/index.js'`.
+Expected: FAIL (`Cannot find module '../src/parser/index.js'`).
 
 - [ ] **Step 4: Create `src/parser/tags.ts` (empty for now)**
 
@@ -440,7 +440,7 @@ git commit -m "Add parser for minimal YAML (gdl + game block)"
 
 ---
 
-## Task 4: Parser — stores block
+## Task 4: Parser: stores block
 
 **Files:**
 - Modify: `src/parser/index.ts`
@@ -482,7 +482,7 @@ Append inside the `describe('parseYaml', ...)` block:
 - [ ] **Step 3: Run to verify failure**
 
 Run: `pnpm test parser`
-Expected: FAIL — `doc.stores` is undefined.
+Expected: FAIL (`doc.stores` is undefined).
 
 - [ ] **Step 4: Extend the parser**
 
@@ -564,7 +564,7 @@ git commit -m "Parse stores block"
 
 ---
 
-## Task 5: Parser — context block with literals and interpolation
+## Task 5: Parser: context block with literals and interpolation
 
 **Files:**
 - Modify: `src/parser/index.ts`
@@ -602,7 +602,7 @@ context:
 - [ ] **Step 3: Run to verify failure**
 
 Run: `pnpm test parser`
-Expected: FAIL — `doc.context` undefined.
+Expected: FAIL (`doc.context` undefined).
 
 - [ ] **Step 4: Extend the parser**
 
@@ -678,7 +678,7 @@ git commit -m "Parse context bindings with interpolation detection"
 
 ---
 
-## Task 6: Parser — `!storeBranch` and `!osBranch` tags
+## Task 6: Parser: `!storeBranch` and `!osBranch` tags
 
 **Files:**
 - Modify: `src/parser/tags.ts`
@@ -690,7 +690,7 @@ The eemeli/yaml library lets us register custom tags that transform a node durin
 
 - [ ] **Step 1: Replace `src/parser/tags.ts`**
 
-We register the branch tags with the parser so it doesn't emit unknown-tag warnings, but with an identity `resolve` so the underlying YAMLMap node — and crucially its `.tag` string — survives in the AST. Detection happens in `parseValueNode` by inspecting `node.tag` directly. This avoids relying on internal shape choices of the yaml library's resolver path.
+We register the branch tags with the parser so it doesn't emit unknown-tag warnings, but with an identity `resolve` so the underlying YAMLMap node (and crucially its `.tag` string) survives in the AST. Detection happens in `parseValueNode` by inspecting `node.tag` directly. This avoids relying on internal shape choices of the yaml library's resolver path.
 
 ```ts
 import type { Tags } from 'yaml';
@@ -743,7 +743,7 @@ context:
 - [ ] **Step 4: Run to verify failure**
 
 Run: `pnpm test parser`
-Expected: FAIL — branch.kind is not 'storeBranch' (the parser doesn't recognise the tagged node yet).
+Expected: FAIL (branch.kind is not 'storeBranch'; the parser doesn't recognise the tagged node yet).
 
 - [ ] **Step 5: Extend `parseValueNode` to handle branch tags**
 
@@ -818,7 +818,7 @@ git commit -m "Parse !storeBranch / !osBranch / !versionBranch tags"
 
 ---
 
-## Task 7: Parser — modTypes block
+## Task 7: Parser: modTypes block
 
 **Files:**
 - Modify: `src/parser/index.ts`
@@ -904,7 +904,7 @@ git commit -m "Parse modTypes block"
 
 ---
 
-## Task 8: Validator — game, stores, modTypes structural rules
+## Task 8: Validator: game, stores, modTypes structural rules
 
 **Files:**
 - Create: `src/schema/types.ts`
@@ -992,7 +992,7 @@ modTypes:
 - [ ] **Step 3: Run to verify failure**
 
 Run: `pnpm test validator`
-Expected: FAIL — module not found.
+Expected: FAIL (module not found).
 
 - [ ] **Step 4: Create `src/schema/validator.ts`**
 
@@ -1098,7 +1098,7 @@ git commit -m "Add schema validator with structural rules"
 
 ---
 
-## Task 9: Runtime — branch-tag dispatch and interpolation
+## Task 9: Runtime: branch-tag dispatch and interpolation
 
 **Files:**
 - Create: `src/runtime/branch-tags.ts`
@@ -1489,7 +1489,7 @@ git commit -m "Add Vortex API shim and minimal vendored vortex-api types"
 
 ---
 
-## Task 11: Codegen — emit extension.ts
+## Task 11: Codegen: emit extension.ts
 
 **Files:**
 - Create: `src/codegen/emit.ts`
@@ -1654,8 +1654,8 @@ git commit -m "Emit extension.ts and info.json from a validated document"
 ## Task 12: Writing emitted files to .gdl-out/
 
 **Files:**
-- Modify: `src/codegen/emit.ts` — add `writeEmittedFiles` helper
-- Modify: `tests/codegen.test.ts` — add a filesystem case
+- Modify: `src/codegen/emit.ts` (add `writeEmittedFiles` helper)
+- Modify: `tests/codegen.test.ts` (add a filesystem case)
 
 - [ ] **Step 1: Append a test in `tests/codegen.test.ts`**
 
@@ -1680,7 +1680,7 @@ describe('writeEmittedFiles', () => {
 - [ ] **Step 2: Run to verify failure**
 
 Run: `pnpm test codegen`
-Expected: FAIL — `writeEmittedFiles` not exported.
+Expected: FAIL (`writeEmittedFiles` not exported).
 
 - [ ] **Step 3: Add `writeEmittedFiles` to `src/codegen/emit.ts`**
 
@@ -1713,7 +1713,7 @@ git commit -m "Write emitted files to .gdl-out/"
 
 ---
 
-## Task 13: Bundler — webpack invocation
+## Task 13: Bundler: webpack invocation
 
 **Files:**
 - Create: `src/bundler/webpack.config.ts`
@@ -1813,7 +1813,7 @@ describe('runBundler', () => {
 - [ ] **Step 4: Run to verify pass**
 
 Run: `pnpm test bundler`
-Expected: PASS (note the 30s timeout — webpack startup is slow).
+Expected: PASS (note the 30s timeout; webpack startup is slow).
 
 - [ ] **Step 5: Commit**
 
@@ -1828,7 +1828,7 @@ git commit -m "Add webpack bundler invocation with @gdl/runtime alias"
 
 **Files:**
 - Create: `src/commands/build.ts`
-- Modify: `tests/codegen.test.ts` (optional — covered by e2e)
+- Modify: `tests/codegen.test.ts` (optional; covered by e2e)
 
 `gdl build` is the public verb. It reads `game.yaml`, parses → validates → resolves → emits → bundles, copying `info.json` into `dist/` next to the bundle.
 
@@ -2028,7 +2028,7 @@ describe('end-to-end', () => {
 - [ ] **Step 4: Run the e2e test**
 
 Run: `pnpm test e2e`
-Expected: PASS (60s timeout — webpack is the slowest step).
+Expected: PASS (60s timeout; webpack is the slowest step).
 
 - [ ] **Step 5: Commit**
 
@@ -2095,7 +2095,7 @@ If the screenshot was not captured (e.g., no Vortex available in this environmen
 - [ ] End-to-end fixture produces `dist/extension.js` and `dist/info.json` with the expected fields
 - [ ] No code references types that are not defined in this plan (`GdlRuntime`, `BuildError`, `DocumentNode`, `ResolvableValue`, etc. all defined)
 - [ ] No `TODO`, `TBD`, or "see later" comments in committed code
-- [ ] The MVP correctly excludes installers, tools, load order, prelaunch, diagnostics, hooks, tests block, JSON Schema generation, source maps, and the publish/package CLI verbs — these are explicitly Plan 2/3/4
+- [ ] The MVP correctly excludes installers, tools, load order, prelaunch, diagnostics, hooks, tests block, JSON Schema generation, source maps, and the publish/package CLI verbs (explicitly Plan 2/3/4)
 
 ---
 
