@@ -36,6 +36,16 @@ export interface ToolbarActionDecl {
     | { kind: 'openUrl';  template: string };
 }
 
+export type DidDeployHook = (ctx: {
+  profileId: string;
+  deployment: unknown;
+  api: unknown;
+}) => Promise<void>;
+
+export interface EventHooks {
+  didDeploy?: DidDeployHook;
+}
+
 export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
 
@@ -49,6 +59,8 @@ export class GdlRuntime {
     installers: InstallerRule[] = [],
     discovery: { versionHook?: (ctx: DiscoveryFacts) => Promise<string | null> } = {},
     toolbarActions: ToolbarActionDecl[] = [],
+    setupDirs: string[] = [],
+    eventHooks: EventHooks = {},
   ) {
     const game: IGame = {
       id: decl.id,
@@ -74,6 +86,16 @@ export class GdlRuntime {
       },
       queryModPath: () => '.',
     };
+    if (setupDirs.length > 0) {
+      game.setup = async () => {
+        const { util } = await import('vortex-api');
+        const ctx = this.resolvedCtx ?? {};
+        for (const tpl of setupDirs) {
+          const path = interpolate(tpl, ctx);
+          await util.fs.ensureDirWritableAsync(path);
+        }
+      };
+    }
     this.api.registerGame(game);
 
     for (const mt of modTypes) {
@@ -93,6 +115,14 @@ export class GdlRuntime {
 
     for (const action of toolbarActions) {
       this.registerToolbarAction(decl.id, action);
+    }
+
+    if (eventHooks.didDeploy) {
+      const userHook = eventHooks.didDeploy;
+      this.api.api.events.on('did-deploy', (...args: unknown[]) => {
+        const [profileId, deployment] = args as [string, unknown];
+        void userHook({ profileId, deployment, api: this.api.api });
+      });
     }
   }
 
