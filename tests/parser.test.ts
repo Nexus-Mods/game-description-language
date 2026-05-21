@@ -125,4 +125,57 @@ nexus:
     expect(doc.nexus!.fileGroupId).toBe(7418978);
     expect(doc.nexus!.displayName).toBe('Hello World Support for Vortex');
   });
+
+  it('parses installer with unless predicate', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when: !hasFile "**/*.pak"
+    unless: !any
+      - !hasFile "**/LogicMods/**"
+      - !hasFile "**/Scripts/*.lua"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml');
+    const inst = doc.installers![0]!;
+    expect(inst.unless).toBeDefined();
+    expect(inst.unless!.kind).toBe('any');
+    if (inst.unless!.kind !== 'any') return;
+    expect(inst.unless!.arms).toHaveLength(2);
+    expect(inst.unless!.arms[0]).toMatchObject({ kind: 'hasFile' });
+    expect(inst.unless!.arms[1]).toMatchObject({ kind: 'hasFile' });
+  });
+
+  it('leaves unless undefined when the YAML omits it', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 30
+    when: !hasFile "**/*.pak"
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+`, 'inline.yaml');
+    expect(doc.installers![0]!.unless).toBeUndefined();
+  });
 });

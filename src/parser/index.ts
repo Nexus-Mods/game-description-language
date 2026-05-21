@@ -440,6 +440,8 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
       const id = String(entry.get('id') ?? '');
       const priority = Number(entry.get('priority') ?? 50);
       const when = parsePredicate(entry.get('when', true) as YamlNode, file, source);
+      const unlessYaml = entry.get('unless', true);
+      const unless = unlessYaml ? parsePredicate(unlessYaml as YamlNode, file, source) : undefined;
 
       const routeYaml = entry.get('route', true);
       let single: SingleInstallerForm | undefined;
@@ -477,6 +479,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
         id,
         priority,
         when,
+        ...(unless   !== undefined && { unless }),
         ...(single   !== undefined && { single }),
         ...(route    !== undefined && { route }),
         ...(modType  !== undefined && { modType }),
