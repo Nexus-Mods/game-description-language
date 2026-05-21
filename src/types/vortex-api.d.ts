@@ -83,6 +83,9 @@ declare module 'vortex-api' {
     ) => void;
     api: {
       getState: () => unknown;
+      events: {
+        on: (event: string, handler: (...args: unknown[]) => void) => void;
+      };
     };
   }
 
@@ -99,6 +102,9 @@ declare module 'vortex-api' {
 
   export const util: {
     opn: (target: string) => Promise<void>;
+    fs: {
+      ensureDirWritableAsync: (path: string) => Promise<void>;
+    };
   };
 
   export const selectors: {
