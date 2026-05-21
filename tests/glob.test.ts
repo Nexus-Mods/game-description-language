@@ -44,3 +44,17 @@ describe('matchAny', () => {
     expect(matchAny(['a.txt', 'b.lua'], m)).toBe(false);
   });
 });
+
+describe('case insensitivity', () => {
+  it('matches regardless of case in the input path', () => {
+    const m = compileGlob('**/dwmapi.dll');
+    expect(m('Pack/inject/dwmapi.dll')).toBe(true);
+    expect(m('Pack/inject/DWMAPI.DLL')).toBe(true);
+    expect(m('Pack/inject/DwMapi.Dll')).toBe(true);
+  });
+
+  it('matches regardless of case in the pattern', () => {
+    const m = compileGlob('**/DWMAPI.DLL');
+    expect(m('Pack/inject/dwmapi.dll')).toBe(true);
+  });
+});

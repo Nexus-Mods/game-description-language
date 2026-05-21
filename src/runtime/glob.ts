@@ -5,7 +5,7 @@ export type GlobMatcher = (path: string) => boolean;
 export const compileGlob = (pattern: string): GlobMatcher => {
   // Trailing slash means "this directory" — match any file under it.
   const normalised = pattern.endsWith('/') ? `${pattern}**/*` : pattern;
-  const m = picomatch(normalised, { dot: true, nocase: false });
+  const m = picomatch(normalised, { dot: true, nocase: true });
   return (path: string) => m(path);
 };
 
