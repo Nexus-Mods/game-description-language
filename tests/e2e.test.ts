@@ -53,6 +53,11 @@ describe('end-to-end (subnautica2-shaped)', () => {
     expect(bundle).toMatch(/['"]logic-mod['"]/);
     expect(bundle).toMatch(/['"]composite-mod['"]/);
     expect(bundle).toMatch(/detectGameVersion/);
+    expect(bundle).toMatch(/registerAction/);
+    expect(bundle).toMatch(/['"]open-ue4ss-settings['"]/);
+    expect(bundle).toMatch(/['"]open-mods-txt['"]/);
+    expect(bundle).toMatch(/['"]open-nexus-page['"]/);
+
 
     const testsGen = readFileSync(join(work, '.gdl-out', 'tests.gen.ts'), 'utf8');
     expect(testsGen).toContain("describe('subnautica2-shaped — generated tests'");

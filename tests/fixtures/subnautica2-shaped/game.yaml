@@ -99,3 +99,19 @@ tests:
         - A/Cool.pak
       expect:
         matched: composite-mod
+
+toolbarActions:
+  - id: open-ue4ss-settings
+    title: Open UE4SS Settings INI
+    priority: 200
+    target: !openFile "${ue4ssModsRoot}/../UE4SS-settings.ini"
+
+  - id: open-mods-txt
+    title: Open UE4SS mods.txt
+    priority: 201
+    target: !openFile "${ue4ssModsRoot}/mods.txt"
+
+  - id: open-nexus-page
+    title: Open Nexus Page
+    priority: 202
+    target: !openUrl https://www.nexusmods.com/subnautica2
