@@ -175,5 +175,29 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.nexus) {
+    if (!Number.isInteger(doc.nexus.modId) || doc.nexus.modId <= 0) {
+      errors.push({
+        code: 'GDL130',
+        message: '`nexus.modId` must be a positive integer (the mod-page id on Nexus)',
+        span: doc.nexus.span,
+      });
+    }
+    if (!Number.isInteger(doc.nexus.fileGroupId) || doc.nexus.fileGroupId <= 0) {
+      errors.push({
+        code: 'GDL131',
+        message: '`nexus.fileGroupId` must be a positive integer (the file-group id Nexus assigns to your mod page)',
+        span: doc.nexus.span,
+      });
+    }
+    if (!doc.nexus.displayName.trim()) {
+      errors.push({
+        code: 'GDL132',
+        message: '`nexus.displayName` is required (human-friendly name shown on uploads)',
+        span: doc.nexus.span,
+      });
+    }
+  }
+
   return errors;
 };

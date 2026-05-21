@@ -14,6 +14,7 @@ export interface DocumentNode extends Node {
   installers?: InstallerNode[];
   discovery?: DiscoveryNode;
   tests?: TestsNode;
+  nexus?: NexusNode;
 }
 
 export interface GameNode extends Node {
@@ -140,4 +141,11 @@ export interface ExpectNode extends Node {
   matched?: string;               // expected installer id
   modType?: string;               // expected modType assigned
   plan?: string[];                // expected destination paths, in any order
+}
+
+export interface NexusNode extends Node {
+  kind: 'nexus';
+  modId: number;
+  fileGroupId: number;
+  displayName: string;
 }

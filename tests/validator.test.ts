@@ -222,4 +222,38 @@ tests:
     const errors = validate(doc);
     expect(errors.some(e => e.code === 'GDL122')).toBe(true);
   });
+
+  it('rejects nexus block with missing modId', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+nexus:
+  modId: 0
+  fileGroupId: 7418978
+  displayName: Hello
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL130')).toBe(true);
+  });
+
+  it('rejects nexus block with missing displayName', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+nexus:
+  modId: 1234
+  fileGroupId: 7418978
+  displayName: ""
+`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL132')).toBe(true);
+  });
 });

@@ -3,7 +3,7 @@ import type {
   DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode,
   InstallerNode, SingleInstallerForm, RouteEntry, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
-  TestsNode, TestCaseNode, ExpectNode, CorpusMode,
+  TestsNode, TestCaseNode, ExpectNode, CorpusMode, NexusNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -488,6 +488,18 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     tests = parseTestsBlock(testsYaml as YamlNode, file, source);
   }
 
+  const nexusYaml = root.get('nexus', true);
+  let nexus: NexusNode | undefined;
+  if (isMap(nexusYaml)) {
+    nexus = {
+      kind: 'nexus',
+      modId:       Number(nexusYaml.get('modId') ?? 0),
+      fileGroupId: Number(nexusYaml.get('fileGroupId') ?? 0),
+      displayName: String(nexusYaml.get('displayName') ?? ''),
+      span: spanOf(file, source, nexusYaml as YamlNode),
+    };
+  }
+
   return {
     kind: 'document',
     gdl,
@@ -498,6 +510,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(installers !== undefined && { installers }),
     ...(discovery  !== undefined && { discovery }),
     ...(tests      !== undefined && { tests }),
+    ...(nexus      !== undefined && { nexus }),
     span: spanOf(file, source, root),
   };
 };

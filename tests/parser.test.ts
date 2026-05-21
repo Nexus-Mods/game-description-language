@@ -95,4 +95,23 @@ describe('parseYaml', () => {
     expect(c.expect!.modType).toBe('pak');
     expect(c.expect!.plan).toEqual(['${modsRoot}/CoolPak.pak', '${modsRoot}/Readme.md']);
   });
+
+  it('parses nexus block with modId, fileGroupId, displayName', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+nexus:
+  modId: 1234
+  fileGroupId: 7418978
+  displayName: Hello World Support for Vortex
+`, 'inline.yaml');
+    expect(doc.nexus).toBeDefined();
+    expect(doc.nexus!.modId).toBe(1234);
+    expect(doc.nexus!.fileGroupId).toBe(7418978);
+    expect(doc.nexus!.displayName).toBe('Hello World Support for Vortex');
+  });
 });
