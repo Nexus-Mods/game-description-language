@@ -175,6 +175,38 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.validators) {
+    const declaredInstallers = new Set((doc.installers ?? []).map(i => i.id));
+    const declaredModTypes   = new Set((doc.modTypes   ?? []).map(mt => mt.id));
+    const seenIds = new Set<string>();
+    for (const v of doc.validators) {
+      if (!v.id.trim()) {
+        errors.push({ code: 'GDL170', message: 'validator id is required', span: v.span });
+      }
+      if (seenIds.has(v.id)) {
+        errors.push({ code: 'GDL171', message: `duplicate validator id \`${v.id}\``, span: v.span });
+      }
+      seenIds.add(v.id);
+      if (v.assert.matched !== undefined && !declaredInstallers.has(v.assert.matched)) {
+        errors.push({
+          code: 'GDL172',
+          message: `validator \`${v.id}\` asserts matched installer \`${v.assert.matched}\` which is not declared`,
+          span: v.assert.span,
+          hint: declaredInstallers.size
+            ? `declared installers: ${[...declaredInstallers].join(', ')}`
+            : 'no installers declared',
+        });
+      }
+      if (v.assert.modType !== undefined && !declaredModTypes.has(v.assert.modType)) {
+        errors.push({
+          code: 'GDL173',
+          message: `validator \`${v.id}\` asserts modType \`${v.assert.modType}\` which is not declared`,
+          span: v.assert.span,
+        });
+      }
+    }
+  }
+
   if (doc.nexus) {
     if (!Number.isInteger(doc.nexus.modId) || doc.nexus.modId <= 0) {
       errors.push({

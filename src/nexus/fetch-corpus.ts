@@ -1,6 +1,6 @@
 import { mkdir, writeFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { fetchGames, fetchModFiles, fetchArchiveManifest, type NexusModFile } from './client.js';
+import { fetchGames, fetchModFiles, fetchArchiveManifest, fetchPublishedModIds, type NexusModFile } from './client.js';
 
 export interface FetchCorpusOptions {
   gameDomain: string;          // e.g. "subnautica2"
@@ -26,13 +26,10 @@ const pickDefaultFile = (files: NexusModFile[]): NexusModFile | undefined => {
   return [...files].sort((a, b) => b.date - a.date)[0];
 };
 
-// Walk recently-updated mods for a game and download each one's default-file manifest into cacheDir.
-// The mod-id enumeration depends on a future helper; for Plan 3 we accept an explicit `modIds`
-// option from the caller so tests can drive it deterministically. Live enumeration of all mods
-// for a game is a separate concern (a future plan can replace `modIds:` with live enumeration
-// when there's a concrete use case).
+// Download each mod's default-file manifest into cacheDir.
+// When modIds is omitted, auto-discovers all published mods via the Nexus API.
 export interface FetchCorpusInputs extends FetchCorpusOptions {
-  modIds: number[];
+  modIds?: number[];     // empty/undefined = auto-discover all published mods
 }
 
 export const fetchCorpus = async (opts: FetchCorpusInputs): Promise<void> => {
@@ -42,7 +39,11 @@ export const fetchCorpus = async (opts: FetchCorpusInputs): Promise<void> => {
   const game = games.find(g => g.domain_name === opts.gameDomain);
   if (!game) throw new Error(`Unknown Nexus game domain: ${opts.gameDomain}`);
 
-  for (const modId of opts.modIds) {
+  const modIds = opts.modIds && opts.modIds.length > 0
+    ? opts.modIds
+    : await fetchPublishedModIds(opts.gameDomain);
+
+  for (const modId of modIds) {
     try {
       const files = await fetchModFiles(game.id, modId);
       const file = pickDefaultFile(files);

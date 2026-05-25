@@ -3,8 +3,9 @@ import type {
   DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode,
   InstallerNode, InstallerScope, SingleInstallerForm, RouteEntry, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
-  TestsNode, TestCaseNode, ExpectNode, CorpusMode, NexusNode,
-  ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode,
+  TestsNode, TestCaseNode, ExpectNode, CorpusMode,
+  ValidatorNode, ValidatorAssertNode,
+  NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -320,6 +321,59 @@ const parseTestsBlock = (node: YamlNode, file: string, source: string): TestsNod
   };
 };
 
+const parseValidatorsBlock = (node: YamlNode, file: string, source: string): ValidatorNode[] => {
+  if (!isSeq(node)) {
+    throw new BuildErrors([{
+      code: 'GDL160',
+      message: '`validators:` must be a sequence',
+      span: spanOf(file, source, node),
+    }]);
+  }
+
+  const validators: ValidatorNode[] = [];
+  for (const entry of node.items) {
+    if (!isMap(entry)) {
+      throw new BuildErrors([{
+        code: 'GDL161',
+        message: '`validators[]` entries must be mappings',
+        span: spanOf(file, source, entry as YamlNode),
+      }]);
+    }
+
+    const when = parsePredicate(entry.get('when', true) as YamlNode, file, source);
+
+    const assertYaml = entry.get('assert', true);
+    let assert: ValidatorAssertNode;
+    if (isMap(assertYaml)) {
+      const matched = assertYaml.has('matched') ? String(assertYaml.get('matched')) : undefined;
+      const modType = assertYaml.has('modType') ? String(assertYaml.get('modType')) : undefined;
+      assert = {
+        kind: 'validatorAssert',
+        ...(matched !== undefined && { matched }),
+        ...(modType !== undefined && { modType }),
+        span: spanOf(file, source, assertYaml as YamlNode),
+      };
+    } else {
+      throw new BuildErrors([{
+        code: 'GDL162',
+        message: '`validators[].assert` must be a mapping',
+        span: spanOf(file, source, entry),
+      }]);
+    }
+
+    validators.push({
+      kind: 'validator',
+      id: String(entry.get('id') ?? ''),
+      name: String(entry.get('name') ?? ''),
+      when,
+      assert,
+      span: spanOf(file, source, entry),
+    });
+  }
+
+  return validators;
+};
+
 const parseToolbarActionTarget = (node: YamlNode, file: string, source: string): ToolbarActionTarget => {
   const span = spanOf(file, source, node);
   if (isMap(node) && (typeof node.tag !== 'string' || node.tag === '')) {
@@ -575,6 +629,12 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     tests = parseTestsBlock(testsYaml as YamlNode, file, source);
   }
 
+  const validatorsYaml = root.get('validators', true);
+  let validators: ValidatorNode[] | undefined;
+  if (validatorsYaml) {
+    validators = parseValidatorsBlock(validatorsYaml as YamlNode, file, source);
+  }
+
   const nexusYaml = root.get('nexus', true);
   let nexus: NexusNode | undefined;
   if (isMap(nexusYaml)) {
@@ -660,6 +720,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(installers      !== undefined && { installers }),
     ...(discovery       !== undefined && { discovery }),
     ...(tests           !== undefined && { tests }),
+    ...(validators      !== undefined && { validators }),
     ...(nexus           !== undefined && { nexus }),
     ...(toolbarActions  !== undefined && { toolbarActions }),
     ...(setup           !== undefined && { setup }),

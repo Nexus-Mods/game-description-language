@@ -3,11 +3,12 @@ import { join } from 'node:path';
 import { parseYaml } from '../parser/index.js';
 import { validate } from '../schema/validator.js';
 import { BuildErrors } from '../errors.js';
-import { localCachePaths } from '../corpus/archive.js';
+import { localCachePaths, readArchiveEntries } from '../corpus/archive.js';
 import { runCorpus } from '../corpus/runner.js';
+import { runValidators, type ValidatorDef } from '../corpus/validator-runner.js';
 import { fetchCorpus } from '../nexus/fetch-corpus.js';
 import type { InstallerRule } from '../runtime/installer-engine.js';
-import type { DocumentNode, InstallerNode, ValueNode, PredicateNode } from '../parser/ast.js';
+import type { DocumentNode, InstallerNode, ValidatorNode, ValueNode, PredicateNode } from '../parser/ast.js';
 import type { PredicateExpr } from '../runtime/predicate.js';
 
 // Lower AST → runtime shapes (separate from codegen's stringly-typed render).
@@ -83,6 +84,16 @@ const flatVarsFromDoc = (doc: DocumentNode): Record<string, string> => {
   return vars;
 };
 
+const lowerValidator = (v: ValidatorNode): ValidatorDef => ({
+  id: v.id,
+  name: v.name,
+  when: lowerPredicate(v.when),
+  assert: {
+    ...(v.assert.matched !== undefined && { matched: v.assert.matched }),
+    ...(v.assert.modType !== undefined && { modType: v.assert.modType }),
+  },
+});
+
 export interface TestCorpusArgs {
   cwd: string;
   yamlPath?: string;
@@ -102,15 +113,11 @@ export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
       process.stderr.write('--fetch requires `tests.corpus: nexus` in game.yaml\n');
       process.exit(1);
     }
-    const modIds = args.modIds ?? [];
-    if (modIds.length === 0) {
-      process.stderr.write('--fetch requires --mods <id,id,…> until live enumeration lands\n');
-      process.exit(1);
-    }
+    const modIds = args.modIds && args.modIds.length > 0 ? args.modIds : undefined;
     await fetchCorpus({
-      gameDomain: doc.game.id,           // assume game.id == Nexus domain_name
+      gameDomain: doc.game.nexusDomain ?? doc.game.id,
       cacheDir: join(args.cwd, 'tests', 'cache'),
-      modIds,
+      ...(modIds !== undefined && { modIds }),
       onProgress: (e) => {
         const sym = e.kind === 'fetched' ? '↓' : e.kind === 'skipped' ? '·' : '✖';
         const tail = 'reason' in e ? `  ${e.reason}` : '';
@@ -127,7 +134,8 @@ export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
     return;
   }
 
-  const report = runCorpus(rules, archives, { vars: flatVarsFromDoc(doc) });
+  const vars = flatVarsFromDoc(doc);
+  const report = runCorpus(rules, archives, { vars });
 
   for (const e of report.entries) {
     const name = e.archive.split('/').pop()!;
@@ -142,6 +150,33 @@ export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
   process.stdout.write(
     `\nsummary: ${report.matched} matched, ${report.unmatched} unmatched, ${report.failed} failed, ${report.total} total\n`,
   );
+
+  // Run validators if defined.
+  const validatorDefs = (doc.validators ?? []).map(lowerValidator);
+  if (validatorDefs.length > 0) {
+    // Build archive contents map for validator predicate evaluation.
+    const archiveContents = new Map<string, readonly string[]>();
+    for (const archive of archives) {
+      try {
+        archiveContents.set(archive, readArchiveEntries(archive));
+      } catch { /* skip unreadable archives */ }
+    }
+
+    const vReport = runValidators(validatorDefs, report.entries, archiveContents, vars);
+    process.stdout.write('\nvalidators:\n');
+    for (const r of vReport.results) {
+      const name = r.archive.split('/').pop()!;
+      if (r.passed) {
+        process.stdout.write(`  ✓ [${r.validatorId}] ${name}\n`);
+      } else {
+        process.stdout.write(`  ✖ [${r.validatorId}] ${name}  ${r.message}\n`);
+      }
+    }
+    process.stdout.write(
+      `\nvalidators: ${vReport.passed} passed, ${vReport.failed} failed, ${vReport.total} total\n`,
+    );
+    if (vReport.failed > 0) process.exit(1);
+  }
 
   if (report.failed > 0) process.exit(1);
 };

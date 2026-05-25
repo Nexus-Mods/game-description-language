@@ -4,6 +4,7 @@ import { buildInstallPlan, type InstallerRule, type InstallInstruction } from '.
 export interface CorpusEntry {
   archive: string;
   matchedInstaller?: string;
+  matchedModType?: string;
   planSize: number;
   error?: string;
 }
@@ -42,10 +43,12 @@ export const runCorpus = (
         if (result.length > 0) { matchedRule = rule; plan = result; break; }
       }
       if (matchedRule) {
+        const modType = plan[0]?.modType;
         entries.push({
           archive,
           planSize: plan.length,
-          ...(matchedRule && { matchedInstaller: matchedRule.id }),
+          matchedInstaller: matchedRule.id,
+          ...(modType !== undefined && { matchedModType: modType }),
         });
         matched++;
       } else {

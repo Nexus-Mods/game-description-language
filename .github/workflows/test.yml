@@ -50,12 +50,18 @@ jobs:
         run: pnpm test
         if: hashFiles('package.json') != ''
 
-      - name: Fetch + run corpus (Nexus key present)
+      - name: Fetch + run corpus (Nexus key present, specific mods)
         if: env.HAS_NEXUS_KEY == 'true' && inputs.mod-ids != ''
         env:
           NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}
         run: node gdl/dist/cli.js test:corpus --fetch --mods "${{ inputs.mod-ids }}"
 
-      - name: Run corpus (no fetch, no Nexus key OR no mod-ids)
-        if: env.HAS_NEXUS_KEY != 'true' || inputs.mod-ids == ''
+      - name: Fetch + run corpus (Nexus key present, all mods)
+        if: env.HAS_NEXUS_KEY == 'true' && inputs.mod-ids == ''
+        env:
+          NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}
+        run: node gdl/dist/cli.js test:corpus --fetch
+
+      - name: Run corpus (no Nexus key, cache only)
+        if: env.HAS_NEXUS_KEY != 'true'
         run: node gdl/dist/cli.js test:corpus

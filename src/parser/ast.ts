@@ -14,6 +14,7 @@ export interface DocumentNode extends Node {
   installers?: InstallerNode[];
   discovery?: DiscoveryNode;
   tests?: TestsNode;
+  validators?: ValidatorNode[];
   nexus?: NexusNode;
   toolbarActions?: ToolbarActionNode[];
   setup?: SetupNode;
@@ -151,6 +152,20 @@ export interface ExpectNode extends Node {
   matched?: string;               // expected installer id
   modType?: string;               // expected modType assigned
   plan?: string[];                // expected destination paths, in any order
+}
+
+export interface ValidatorNode extends Node {
+  kind: 'validator';
+  id: string;
+  name: string;
+  when: PredicateNode;
+  assert: ValidatorAssertNode;
+}
+
+export interface ValidatorAssertNode extends Node {
+  kind: 'validatorAssert';
+  matched?: string;               // expected installer id
+  modType?: string;                // expected mod type
 }
 
 export interface NexusNode extends Node {
