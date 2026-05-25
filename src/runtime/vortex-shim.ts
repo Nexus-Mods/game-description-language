@@ -89,7 +89,7 @@ export class GdlRuntime {
           }
         }
         this.resolvedCtx = resolveContext(contextSpec, facts);
-        return { path: facts.installPath, store: facts.store };
+        return facts.installPath;
       },
       queryModPath: () => '.',
     };
@@ -256,9 +256,11 @@ export class GdlRuntime {
   private async discover(stores: StoreDecl[]): Promise<DiscoveryFacts | null> {
     const appIds = stores.map(s => String(s.value));
     if (appIds.length === 0) return null;
-    const { GameStoreHelper } = await import('vortex-api');
+    const { util, log } = await import('vortex-api');
     try {
-      const found = await GameStoreHelper.findByAppId(appIds);
+      log('info', '[gdl] discover: calling findByAppId', { appIds, hasGSH: !!util.GameStoreHelper });
+      const found = await util.GameStoreHelper.findByAppId(appIds);
+      log('info', '[gdl] discover: findByAppId returned', { found: JSON.stringify(found) });
       if (!found) return null;
       this.discoveredStore = found.gameStoreId;
       return {
@@ -268,7 +270,9 @@ export class GdlRuntime {
         installPath: found.gamePath,
         executablePath: found.gamePath,   // refined by Vortex later via game.executable()
       };
-    } catch {
+    } catch (err: unknown) {
+      const { log: vlog } = await import('vortex-api');
+      vlog('error', '[gdl] discover: findByAppId threw', { error: String(err), stack: (err as Error)?.stack });
       return null;
     }
   }
