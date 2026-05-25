@@ -53,6 +53,11 @@ export const buildExtension = async (args: BuildArgs): Promise<void> => {
   // Copy info.json next to dist/extension.js so Vortex sees it.
   await mkdir(join(args.cwd, 'dist'), { recursive: true });
   await copyFile(join(args.cwd, '.gdl-out', 'info.json'), join(args.cwd, 'dist', 'info.json'));
+
+  // Copy logo asset into dist/ so it's included in the package zip.
+  if (doc.game.logo) {
+    await copyFile(join(args.cwd, doc.game.logo), join(args.cwd, 'dist', doc.game.logo));
+  }
 };
 
 export const reportBuildError = (err: unknown): string => {
