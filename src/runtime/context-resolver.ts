@@ -16,8 +16,9 @@ export interface DiscoveryFacts {
   arch: 'x64' | 'arm64';
   installPath: string;
   executablePath: string;
-  userDataPath?: string;
-  documentsPath?: string;
+  appDataLocal?: string;      // Windows: %LOCALAPPDATA%
+  appDataLocalLow?: string;   // Windows: %LOCALAPPDATA%/../LocalLow
+  appDataRoaming?: string;    // Windows: %APPDATA%
   version?: string;
 }
 

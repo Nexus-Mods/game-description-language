@@ -244,16 +244,21 @@ export class GdlRuntime {
   }
 
   private resolveModTypePath(mt: ModTypeDecl, ctx: ResolvedContext = this.resolvedCtx ?? {}): string {
-    if (mt.path.kind === 'literal') return String(mt.path.raw);
-    if (mt.path.kind === 'interpolated') {
-      return interpolate(mt.path.template, ctx);
+    try {
+      if (mt.path.kind === 'literal') return String(mt.path.raw);
+      if (mt.path.kind === 'interpolated') {
+        return interpolate(mt.path.template, ctx);
+      }
+      // Branch value: dispatch then recursively resolve the chosen arm against ctx.
+      const arm = resolveBranch(mt.path, ctx as Record<string, string>) as ResolvableValue;
+      if (arm.kind === 'literal') return String(arm.raw);
+      if (arm.kind === 'interpolated') return interpolate(arm.template, ctx);
+      // Nested branches are uncommon for modType paths but supported for symmetry.
+      return String(resolveBranch(arm, ctx as Record<string, string>));
+    } catch {
+      // Context not yet resolved (getPath called before discovery); return empty.
+      return '';
     }
-    // Branch value: dispatch then recursively resolve the chosen arm against ctx.
-    const arm = resolveBranch(mt.path, ctx as Record<string, string>) as ResolvableValue;
-    if (arm.kind === 'literal') return String(arm.raw);
-    if (arm.kind === 'interpolated') return interpolate(arm.template, ctx);
-    // Nested branches are uncommon for modType paths but supported for symmetry.
-    return String(resolveBranch(arm, ctx as Record<string, string>));
   }
 
   private async discover(stores: StoreDecl[]): Promise<DiscoveryFacts | null> {
@@ -264,12 +269,32 @@ export class GdlRuntime {
       const found = await util.GameStoreHelper.findByAppId(appIds);
       if (!found) return null;
       this.discoveredStore = found.gameStoreId;
+      const os = process.platform === 'win32' ? 'windows' as const
+               : process.platform === 'darwin' ? 'macos' as const
+               : 'linux' as const;
+
+      // Compute platform-specific AppData paths (Windows only for now).
+      let appDataLocal: string | undefined;
+      let appDataLocalLow: string | undefined;
+      let appDataRoaming: string | undefined;
+      if (os === 'windows') {
+        const { homedir } = await import('node:os');
+        const { join, resolve } = await import('node:path');
+        const home = homedir();
+        appDataLocal    = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
+        appDataLocalLow = resolve(appDataLocal, '..', 'LocalLow');
+        appDataRoaming  = process.env.APPDATA || join(home, 'AppData', 'Roaming');
+      }
+
       return {
         store: found.gameStoreId,
-        os: process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux',
+        os,
         arch: process.arch === 'arm64' ? 'arm64' : 'x64',
         installPath: found.gamePath,
         executablePath: found.gamePath,   // refined by Vortex later via game.executable()
+        ...(appDataLocal    !== undefined && { appDataLocal }),
+        ...(appDataLocalLow !== undefined && { appDataLocalLow }),
+        ...(appDataRoaming  !== undefined && { appDataRoaming }),
       };
     } catch {
       return null;
