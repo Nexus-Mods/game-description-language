@@ -10,6 +10,7 @@ declare module 'vortex-api' {
     environment?: Record<string, string>;
     details?: Record<string, unknown>;
     queryPath: () => Promise<string | { path: string; store?: string }>;
+    mergeMods: boolean | ((mod: unknown) => string);
     queryModPath: () => string;
     setup?: (discovery: { path?: string }) => Promise<void>;
     supportedTools?: unknown[];
@@ -108,5 +109,6 @@ declare module 'vortex-api' {
 
   export const selectors: {
     activeGameId: (state: unknown) => string | undefined;
+    discoveryByGame: (state: unknown, gameId: string) => { path?: string } | undefined;
   };
 }

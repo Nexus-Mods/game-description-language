@@ -91,6 +91,7 @@ export class GdlRuntime {
         this.resolvedCtx = resolveContext(contextSpec, facts);
         return facts.installPath;
       },
+      mergeMods: true,
       queryModPath: () => '.',
     };
     if (setupDirs.length > 0) {
@@ -110,11 +111,13 @@ export class GdlRuntime {
         mt.id,
         50,
         (gameId) => gameId === decl.id,
-        (game) => {
-          const gamePath = (game as { gamePath?: string } | null)?.gamePath;
+        () => {
+          const { selectors } = require('vortex-api') as typeof import('vortex-api');
+          const state = this.api.api.getState();
+          const discovery = selectors.discoveryByGame(state, decl.id);
           const ctx = {
             ...this.resolvedCtx ?? {},
-            ...(gamePath !== undefined && { installPath: gamePath }),
+            ...(discovery?.path !== undefined && { installPath: discovery.path }),
           };
           return this.resolveModTypePath(mt, ctx as ResolvedContext);
         },
