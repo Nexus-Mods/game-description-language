@@ -22,7 +22,7 @@ const collectHookIds = (doc: DocumentNode): string[] => {
       visitValue(v.default);
     }
   };
-  if (doc.discovery?.version) ids.add(doc.discovery.version.hookId);
+  if (doc.discovery?.version?.kind === 'hookRef') ids.add(doc.discovery.version.hookId);
   for (const b of doc.context?.bindings ?? []) visitValue(b.value);
   for (const mt of doc.modTypes ?? []) visitValue(mt.path);
   return [...ids];

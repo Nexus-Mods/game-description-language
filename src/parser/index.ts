@@ -3,6 +3,7 @@ import type {
   DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode,
   InstallerNode, InstallerScope, SingleInstallerForm, RouteEntry, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
+  FileVersionNode, VersionSourceNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode,
   ValidatorNode, ValidatorAssertNode,
   NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode,
@@ -45,6 +46,58 @@ const parseHookRef = (node: YamlNode | null | undefined, file: string, source: s
   throw new BuildErrors([{
     code: 'GDL060',
     message: 'expected a hook reference object: { hook: <id> }',
+    span: spanOf(file, source, node ?? null),
+  }]);
+};
+
+const parseVersionSource = (node: YamlNode | null | undefined, file: string, source: string): VersionSourceNode => {
+  if (!isMap(node)) {
+    throw new BuildErrors([{
+      code: 'GDL061',
+      message: 'discovery.version must be { hook: <id> } or { file: <path>, regex: <pattern> }',
+      span: spanOf(file, source, node ?? null),
+    }]);
+  }
+
+  const keys = new Set<string>();
+  for (const item of node.items) {
+    if (isScalar(item.key) && typeof item.key.value === 'string') {
+      keys.add(item.key.value);
+    }
+  }
+
+  // Reject ambiguous form with both hook and file
+  if (keys.has('hook') && keys.has('file')) {
+    throw new BuildErrors([{
+      code: 'GDL061',
+      message: 'discovery.version must be { hook: <id> } or { file: <path>, regex: <pattern> }, not both',
+      span: spanOf(file, source, node),
+    }]);
+  }
+
+  // Hook form: { hook: <name> }
+  if (keys.has('hook')) return parseHookRef(node, file, source);
+
+  // File+regex form: { file: <path>, regex: <pattern> }
+  if (keys.has('file')) {
+    const span = spanOf(file, source, node);
+    const fileVal = node.get('file');
+    const regexVal = node.get('regex');
+    if (typeof fileVal !== 'string' || !fileVal.trim()) {
+      throw new BuildErrors([{ code: 'GDL062', message: 'discovery.version.file must be a non-empty string', span }]);
+    }
+    if (typeof regexVal !== 'string' || !regexVal.trim()) {
+      throw new BuildErrors([{ code: 'GDL063', message: 'discovery.version.regex must be a non-empty string', span }]);
+    }
+    try { new RegExp(regexVal); } catch {
+      throw new BuildErrors([{ code: 'GDL064', message: `discovery.version.regex is not a valid regular expression: ${regexVal}`, span }]);
+    }
+    return { kind: 'fileVersion', file: fileVal, regex: regexVal, span } satisfies FileVersionNode;
+  }
+
+  throw new BuildErrors([{
+    code: 'GDL061',
+    message: 'discovery.version must be { hook: <id> } or { file: <path>, regex: <pattern> }',
     span: spanOf(file, source, node ?? null),
   }]);
 };
@@ -635,7 +688,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
   if (isMap(discoveryYaml)) {
     const versionYaml = discoveryYaml.get('version', true);
     if (versionYaml) {
-      const version = parseHookRef(versionYaml as YamlNode, file, source);
+      const version = parseVersionSource(versionYaml as YamlNode, file, source);
       discovery = { kind: 'discovery', version, span: spanOf(file, source, discoveryYaml) };
     } else {
       discovery = { kind: 'discovery', span: spanOf(file, source, discoveryYaml) };

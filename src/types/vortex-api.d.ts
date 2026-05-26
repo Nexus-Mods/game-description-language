@@ -13,6 +13,7 @@ declare module 'vortex-api' {
     mergeMods: boolean | ((mod: unknown) => string);
     queryModPath: () => string;
     setup?: (discovery: { path?: string }) => Promise<void>;
+    getGameVersion?: (gamePath: string, exePath?: string) => Promise<string>;
     supportedTools?: unknown[];
   }
 

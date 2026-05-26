@@ -99,6 +99,27 @@ discovery:
     expect(ext.contents).toContain(`import * as hooks from '../src/hooks.js'`);
     expect(ext.contents).toContain(`versionHook: hooks.detectGameVersion`);
   });
+  it('emits inline fileVersion function without hooks import', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+discovery:
+  version:
+    file: "\${installPath}/GameVersion.setting"
+    regex: "=VersionPrefix:(\\\\d+\\\\.\\\\d+\\\\.\\\\d+)"
+`, 'filever.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path.endsWith('extension.ts'))!;
+    expect(ext.contents).not.toContain(`import * as hooks`);
+    expect(ext.contents).toContain('readFile');
+    expect(ext.contents).toContain('interpolate');
+    expect(ext.contents).toContain('GameVersion.setting');
+    expect(ext.contents).toContain('=VersionPrefix:');
+  });
 });
 
 describe('emit toolbar actions', () => {

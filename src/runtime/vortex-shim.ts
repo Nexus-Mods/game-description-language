@@ -50,6 +50,7 @@ export interface EventHooks {
 
 export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
+  private cachedFacts?: DiscoveryFacts;
   private discoveredStore: string | undefined;
 
   constructor(private readonly api: IExtensionContext) {}
@@ -92,12 +93,21 @@ export class GdlRuntime {
             // from the resolved context, and `versionBranch:` falls through to default.
           }
         }
+        this.cachedFacts = facts;
         this.resolvedCtx = resolveContext(contextSpec, facts);
         return facts.installPath;
       },
       mergeMods: true,
       queryModPath: () => '.',
     };
+    if (discovery.versionHook) {
+      const versionHook = discovery.versionHook;
+      game.getGameVersion = async (_gamePath: string) => {
+        const facts = this.cachedFacts ?? await this.discover(stores);
+        if (!facts) return '0.0.0';
+        return await versionHook(facts) ?? '0.0.0';
+      };
+    }
     if (setupDirs.length > 0) {
       game.setup = async () => {
         const { util } = await import('vortex-api');
