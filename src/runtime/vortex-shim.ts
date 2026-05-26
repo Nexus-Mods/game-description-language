@@ -15,6 +15,7 @@ export interface GameDecl {
   logo?: string;
   contributedBy?: string;
   nexusDomain?: string;
+  details?: Record<string, unknown>;
 }
 
 export interface ModTypeDecl {
@@ -75,7 +76,10 @@ export class GdlRuntime {
       requiredFiles: decl.requiredFiles,
       ...(decl.logo          !== undefined && { logo:        decl.logo }),
       ...(decl.contributedBy !== undefined && { contributed: decl.contributedBy }),
-      ...(decl.nexusDomain   !== undefined && { details:     { nexusPageId: decl.nexusDomain } }),
+      details: {
+        ...(decl.nexusDomain !== undefined && { nexusPageId: decl.nexusDomain }),
+        ...decl.details,
+      },
       queryPath: async () => {
         const facts = await this.discover(stores);
         if (!facts) return '';

@@ -30,6 +30,7 @@ export interface GameNode extends Node {
   logo?: string;
   contributedBy?: string;
   nexusDomain?: string;
+  details?: Record<string, string | number | boolean | string[]>;
 }
 
 export type StoreId = 'steam' | 'epic' | 'gog' | 'xbox' | 'ea' | 'microsoftStore' | 'manual';

@@ -446,6 +446,24 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ? requiredFilesYaml.items.map(i => (isScalar(i) ? String(i.value) : String(i)))
     : [];
 
+  let details: Record<string, string | number | boolean | string[]> | undefined;
+  const detailsYaml = gameNode.get('details', true);
+  if (isMap(detailsYaml)) {
+    details = {};
+    for (const pair of detailsYaml.items) {
+      if (!isPair(pair)) continue;
+      const key = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+      if (isSeq(pair.value)) {
+        details[key] = pair.value.items.map(i => (isScalar(i) ? String(i.value) : String(i)));
+      } else if (isScalar(pair.value)) {
+        const v = pair.value.value;
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+          details[key] = v;
+        }
+      }
+    }
+  }
+
   const game: GameNode = {
     kind: 'game',
     id: String(gameNode.get('id') ?? ''),
@@ -455,6 +473,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(gameNode.has('logo')          && { logo:          String(gameNode.get('logo')) }),
     ...(gameNode.has('contributedBy') && { contributedBy: String(gameNode.get('contributedBy')) }),
     ...(gameNode.has('nexusDomain')   && { nexusDomain:   String(gameNode.get('nexusDomain')) }),
+    ...(details !== undefined && Object.keys(details).length > 0 && { details }),
     span: spanOf(file, source, gameSpanNode),
   };
 
