@@ -6,7 +6,7 @@ const renderCase = (c: TestCaseNode): string => {
     ? `{
       ${c.expect.matched !== undefined ? `matched: ${sq(c.expect.matched)},` : ''}
       ${c.expect.modType !== undefined ? `modType: ${sq(c.expect.modType)},` : ''}
-      ${c.expect.plan    !== undefined ? `plan: [${c.expect.plan.map(sq).join(', ')}],` : ''}
+      ${c.expect.plan    !== undefined ? `plan: [${c.expect.plan.map(sq).join(', ')}].map(p => interpolatePath(p, flatVars)),` : ''}
     }`
     : '{}';
 
@@ -88,6 +88,13 @@ function interpolateVars(obj: Record<string, string>): Record<string, string> {
 }
 
 const flatVars = interpolateVars(resolvedVars);
+
+// Interpolate \${name} in a single string using resolved vars.
+function interpolatePath(s: string, vars: Record<string, string>): string {
+  return s.replace(/\\\${([a-zA-Z_][a-zA-Z0-9_]*)}/g, (_m, name) =>
+    vars[name] !== undefined ? (vars[name] as string) : '\${' + name + '}'
+  );
+}
 
 describe(${sq(doc.game.id + ' — generated tests')}, () => {
 ${cases}});

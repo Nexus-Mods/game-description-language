@@ -86,7 +86,8 @@ const stripPath = (
       .pop();
     if (literalDir) {
       const pathSegs = splitSegments(path);
-      const dirIdx = pathSegs.indexOf(literalDir);
+      const literalDirLower = literalDir.toLowerCase();
+      const dirIdx = pathSegs.findIndex(s => s.toLowerCase() === literalDirLower);
       if (dirIdx === -1) {
         // File is not under the anchor directory; exclude it.
         return '';
