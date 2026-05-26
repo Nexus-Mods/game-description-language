@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { buildExtension } from './build.js';
 import { zipDist } from '../packaging/zip.js';
 import { parseYaml } from '../parser/index.js';
+import { extensionId } from '../schema/types.js';
 
 export interface PackageArgs {
   cwd: string;
@@ -14,7 +15,7 @@ export interface PackageResult {
 }
 
 const archiveNameFor = (gameId: string, version: string): string =>
-  `${gameId}-vortex-v${version}.zip`;
+  `${extensionId(gameId)}-vortex-v${version}.zip`;
 
 export const packageExtension = async (args: PackageArgs): Promise<PackageResult> => {
   await buildExtension({

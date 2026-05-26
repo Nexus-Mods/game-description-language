@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseYaml } from '../parser/index.js';
+import { extensionId } from '../schema/types.js';
 
 export type PublishInfoField =
   | 'mod-id'
@@ -23,7 +24,7 @@ export const resolvePublishInfo = async (
       if (typeof pkg.version === 'string') version = pkg.version;
     } catch { /* tolerate */ }
     if (field === 'version') return version;
-    return `${doc.game.id}-vortex-v${version}.zip`;
+    return `${extensionId(doc.game.id)}-vortex-v${version}.zip`;
   }
 
   if (!doc.nexus) {
