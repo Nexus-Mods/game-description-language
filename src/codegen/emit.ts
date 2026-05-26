@@ -144,7 +144,8 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     : '';
 
   const hookIds = new Set<string>();
-  if (doc.discovery?.version) hookIds.add(doc.discovery.version.hookId);
+  const versionNode = doc.discovery?.version;
+  if (versionNode?.kind === 'hookRef') hookIds.add(versionNode.hookId);
   const hookImports = hookIds.size
     ? `import * as hooks from '../src/hooks.js';`
     : '';
@@ -155,9 +156,25 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     ? `import { ${eventHookImports.join(', ')} } from '../src/hooks.js';`
     : '';
 
-  const versionHook = doc.discovery?.version
-    ? `hooks.${doc.discovery.version.hookId}`
-    : 'undefined';
+  let versionHook: string;
+  if (!versionNode) {
+    versionHook = 'undefined';
+  } else if (versionNode.kind === 'hookRef') {
+    versionHook = `hooks.${versionNode.hookId}`;
+  } else {
+    versionHook = [
+      'async (ctx) => {',
+      `  const { readFile } = await import('node:fs/promises');`,
+      `  const { interpolate } = await import('@gdl/runtime');`,
+      '  try {',
+      `    const filePath = interpolate(${sq(versionNode.file)}, ctx);`,
+      `    const content = await readFile(filePath, 'utf8');`,
+      `    const m = content.match(new RegExp(${sq(versionNode.regex)}));`,
+      '    return m?.[1] ?? null;',
+      '  } catch { return null; }',
+      '}',
+    ].join('\n');
+  }
 
   const stores = (doc.stores?.entries ?? [])
     .map(s => `      { id: ${sq(s.id)}, value: ${sq(s.value)} }`)

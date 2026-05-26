@@ -125,10 +125,19 @@ export interface HookRefNode extends Node {
   hookId: string;             // e.g. 'detectGameVersion'
 }
 
+// Declarative file+regex version source
+export interface FileVersionNode extends Node {
+  kind: 'fileVersion';
+  file: string;               // interpolated path, e.g. "${installPath}/Main.mod/..."
+  regex: string;              // regex with capture group 1 for version
+}
+
+export type VersionSourceNode = HookRefNode | FileVersionNode;
+
 // Top-level discovery block
 export interface DiscoveryNode extends Node {
   kind: 'discovery';
-  version?: HookRefNode;       // { hook: detectGameVersion }
+  version?: VersionSourceNode;
 }
 
 // Test harness types

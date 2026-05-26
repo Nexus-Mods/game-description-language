@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseYaml } from '../src/parser/index.js';
+import type { FileVersionNode } from '../src/parser/ast.js';
 
 const fixture = (name: string) =>
   readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -438,6 +439,52 @@ discovery:
   version: { hook: detectGameVersion }
 `, 'inline.yaml');
     expect(doc.discovery?.version?.kind).toBe('hookRef');
+  });
+
+  it('parses file+regex form in discovery.version', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+discovery:
+  version:
+    file: "\${installPath}/Main.mod/Settings/GameVersion.setting"
+    regex: "=VersionPrefix:(\\\\d+\\\\.\\\\d+\\\\.\\\\d+)"
+`, 'inline.yaml');
+    expect(doc.discovery?.version?.kind).toBe('fileVersion');
+    const v = doc.discovery!.version! as FileVersionNode;
+    expect(v.file).toBe('${installPath}/Main.mod/Settings/GameVersion.setting');
+    expect(v.regex).toBe('=VersionPrefix:(\\d+\\.\\d+\\.\\d+)');
+  });
+
+  it('rejects discovery.version with neither hook nor file', () => {
+    expect(() => parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+discovery:
+  version: { unknown: foo }
+`, 'inline.yaml')).toThrow();
+  });
+
+  it('rejects discovery.version with file but no regex', () => {
+    expect(() => parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+discovery:
+  version:
+    file: "some/path.txt"
+`, 'inline.yaml')).toThrow();
   });
 
   it('parses object-form { hook: name } in events.did-deploy', () => {
