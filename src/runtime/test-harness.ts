@@ -13,11 +13,22 @@ export type AssertResult =
 const fmt = (paths: readonly string[]): string =>
   paths.map(p => `  ${p}`).join('\n');
 
+const isAbsolute = (p: string): boolean => /^[a-zA-Z]:/.test(p) || p.startsWith('/');
+
 export const assertPlan = (
   plan: readonly InstallInstruction[],
   matchedId: string,
   expected: ExpectShape,
 ): AssertResult => {
+  // Catch placeAt leaking into copy destinations — Vortex needs relative paths.
+  for (const entry of plan) {
+    if (isAbsolute(entry.relative)) {
+      return {
+        ok: false,
+        message: `installer \`${matchedId}\` produced absolute relative path \`${entry.relative}\` for \`${entry.source}\` — copy destinations must be relative to placeAt`,
+      };
+    }
+  }
   if (expected.matched !== undefined && expected.matched !== matchedId) {
     return {
       ok: false,
