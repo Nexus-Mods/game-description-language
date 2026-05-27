@@ -98,11 +98,12 @@ declare module 'vortex-api' {
 
   export const log: (level: string, message: string, meta?: unknown) => void;
 
+  export const fs: {
+    ensureDirWritableAsync: (path: string) => Promise<void>;
+  };
+
   export const util: {
     opn: (target: string) => Promise<void>;
-    fs: {
-      ensureDirWritableAsync: (path: string) => Promise<void>;
-    };
     GameStoreHelper: {
       findByAppId(appId: string | string[], storeId?: string): Promise<IFoundGame | null>;
     };

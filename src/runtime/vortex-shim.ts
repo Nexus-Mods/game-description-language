@@ -110,11 +110,11 @@ export class GdlRuntime {
     }
     if (setupDirs.length > 0) {
       game.setup = async () => {
-        const { util } = await import('vortex-api');
+        const { fs } = await import('vortex-api');
         const ctx = this.resolvedCtx ?? {};
         for (const tpl of setupDirs) {
           const path = interpolate(tpl, ctx);
-          await util.fs.ensureDirWritableAsync(path);
+          await fs.ensureDirWritableAsync(path);
         }
       };
     }
