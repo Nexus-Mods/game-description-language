@@ -36,7 +36,8 @@ export interface InstallerRule {
 
 export interface InstallInstruction {
   source: string;
-  destination: string;
+  destination: string;        // absolute: placeAt + relative (for tests/corpus)
+  relative: string;           // relative to placeAt (for Vortex copy instructions)
   modType: string;
 }
 
@@ -146,6 +147,7 @@ export const buildInstallPlan = (
         destination: joinSegments(
           [destRoot, relative].filter(s => s.length > 0),
         ),
+        relative,
         modType: rule.modType!,
       });
     }
@@ -167,6 +169,7 @@ export const buildInstallPlan = (
         destination: joinSegments(
           [destRoot, relative].filter(s => s.length > 0),
         ),
+        relative,
         modType: r.modType,
       });
       break;

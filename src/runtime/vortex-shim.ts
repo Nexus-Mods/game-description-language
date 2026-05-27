@@ -180,7 +180,7 @@ export class GdlRuntime {
       if (gid !== gameId) return { instructions: [] };
       const plan = buildInstallPlan(rule, files, ctx);
       const instructions = plan.flatMap(p => [
-        { type: 'copy' as const, source: p.source, destination: p.destination },
+        { type: 'copy' as const, source: p.source, destination: p.relative },
         { type: 'setmodtype' as const, value: p.modType },
       ]);
       return { instructions };
