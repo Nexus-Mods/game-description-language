@@ -59,6 +59,21 @@ export class GdlRuntime {
     this.discoveredStore = store;
   }
 
+  // Lazily resolve context if not already done (handles cached discovery).
+  private async ensureContext(
+    stores: StoreDecl[],
+    contextSpec: ContextSpec,
+  ): Promise<ResolvedContext> {
+    if (!this.resolvedCtx) {
+      const facts = this.cachedFacts ?? await this.discover(stores);
+      if (facts) {
+        this.cachedFacts = facts;
+        this.resolvedCtx = resolveContext(contextSpec, facts);
+      }
+    }
+    return this.resolvedCtx ?? {};
+  }
+
   registerGame(
     decl: GameDecl,
     stores: StoreDecl[],
@@ -111,7 +126,7 @@ export class GdlRuntime {
     if (setupDirs.length > 0) {
       game.setup = async () => {
         const { fs } = await import('vortex-api');
-        const ctx = this.resolvedCtx ?? {};
+        const ctx = await this.ensureContext(stores, contextSpec);
         for (const tpl of setupDirs) {
           const path = interpolate(tpl, ctx);
           await fs.ensureDirWritableAsync(path);
