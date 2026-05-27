@@ -179,10 +179,20 @@ export class GdlRuntime {
       };
       if (gid !== gameId) return { instructions: [] };
       const plan = buildInstallPlan(rule, files, ctx);
-      const instructions = plan.flatMap(p => [
-        { type: 'copy' as const, source: p.source, destination: p.relative },
-        { type: 'setmodtype' as const, value: p.modType },
-      ]);
+      const instructions = plan.flatMap(p => {
+        const dest = p.relative;
+        if (/^[a-zA-Z]:/.test(dest) || dest.startsWith('/')) {
+          // eslint-disable-next-line no-console
+          console.error(
+            `[gdl] BUG: installer "${rule.id}" produced absolute destination "${dest}" — ` +
+            'Vortex copy destinations must be relative. This is a GDL bug.',
+          );
+        }
+        return [
+          { type: 'copy' as const, source: p.source, destination: dest },
+          { type: 'setmodtype' as const, value: p.modType },
+        ];
+      });
       return { instructions };
     };
 
