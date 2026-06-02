@@ -11,7 +11,7 @@ declare module 'vortex-api' {
     details?: Record<string, unknown>;
     queryPath: () => Promise<string | { path: string; store?: string }>;
     mergeMods: boolean | ((mod: unknown) => string);
-    queryModPath: () => string;
+    queryModPath: (gamePath: string) => string;
     setup?: (discovery: { path?: string; store?: string }) => Promise<void>;
     getGameVersion?: (gamePath: string, exePath?: string) => Promise<string>;
     supportedTools?: unknown[];

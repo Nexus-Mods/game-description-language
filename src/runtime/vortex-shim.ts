@@ -23,6 +23,11 @@ export interface GameDecl {
   contributedBy?: string;
   nexusDomain?: string;
   details?: Record<string, unknown>;
+  // Template like `${pakModsPath}` resolved against the runtime context to
+  // produce the "default mods folder" Vortex uses for the "Open Game Mods
+  // folder" action and as the install destination when no modtype matches.
+  // Omitted -> fall back to Vortex's relative-`.` default (== the game root).
+  queryModPath?: string;
 }
 
 export interface ModTypeDecl {
@@ -150,7 +155,26 @@ export class GdlRuntime {
         return facts.installPath;
       },
       mergeMods: true,
-      queryModPath: () => '.',
+      queryModPath: (gamePath: string) => {
+        // Without a configured template, fall back to '.' (Vortex resolves
+        // that against gamePath — same as a no-op).
+        if (!decl.queryModPath) return '.';
+        try {
+          // Prefer the live gamePath Vortex hands us; fall back to whatever
+          // discovery already populated. This makes the action work even if
+          // setup() hasn't run yet (Vortex calls queryModPath at various
+          // points in its lifecycle).
+          const ctx = {
+            ...this.resolvedCtx ?? {},
+            ...(gamePath !== undefined && gamePath !== '' && { installPath: gamePath }),
+          };
+          return interpolate(decl.queryModPath, ctx as ResolvedContext);
+        } catch {
+          // Template references vars not yet bound. Return '.' rather than
+          // crashing — Vortex will fall back to gamePath, same as old default.
+          return '.';
+        }
+      },
     };
     if (discovery.versionHook) {
       const versionHook = discovery.versionHook;

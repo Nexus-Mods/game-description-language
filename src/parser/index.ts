@@ -526,6 +526,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(gameNode.has('logo')          && { logo:          String(gameNode.get('logo')) }),
     ...(gameNode.has('contributedBy') && { contributedBy: String(gameNode.get('contributedBy')) }),
     ...(gameNode.has('nexusDomain')   && { nexusDomain:   String(gameNode.get('nexusDomain')) }),
+    ...(gameNode.has('queryModPath')  && { queryModPath:  String(gameNode.get('queryModPath')) }),
     ...(details !== undefined && Object.keys(details).length > 0 && { details }),
     span: spanOf(file, source, gameSpanNode),
   };

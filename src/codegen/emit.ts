@@ -209,6 +209,7 @@ export default function main(api: IExtensionContext): boolean {
       ${doc.game.logo ? `logo: ${sq(doc.game.logo)},` : ''}
       ${doc.game.contributedBy ? `contributedBy: ${sq(doc.game.contributedBy)},` : ''}
       ${doc.game.nexusDomain ? `nexusDomain: ${sq(doc.game.nexusDomain)},` : ''}
+      ${doc.game.queryModPath ? `queryModPath: ${sq(doc.game.queryModPath)},` : ''}
       ${doc.game.details ? `details: ${JSON.stringify(doc.game.details)},` : ''}
     },
     [

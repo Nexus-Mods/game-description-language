@@ -31,6 +31,10 @@ export interface GameNode extends Node {
   contributedBy?: string;
   nexusDomain?: string;
   details?: Record<string, string | number | boolean | string[]>;
+  // Template resolved against the runtime context to produce the path Vortex
+  // uses for the "Open Game Mods folder" action and as the default mod
+  // location. Receives the live `gamePath` from Vortex as `${installPath}`.
+  queryModPath?: string;
 }
 
 export type StoreId = 'steam' | 'epic' | 'gog' | 'xbox' | 'ea' | 'microsoftStore' | 'manual';
