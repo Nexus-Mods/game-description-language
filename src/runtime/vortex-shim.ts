@@ -1,6 +1,13 @@
 import type { IExtensionContext, IGame, TestSupportedFn, InstallFn, ActionVisibilityFn, ActionRunFn } from 'vortex-api';
 import type { DiscoveryFacts, ResolvedContext, ResolvableValue } from './context-resolver.js';
 import { resolveContext, type ContextSpec } from './context-resolver.js';
+
+// Vortex's IDiscoveryResult isn't re-exported from the package, but its shape
+// is stable. We only consume the two fields we need.
+interface IDiscoveryResult {
+  path?: string;
+  store?: string;
+}
 import { interpolate } from './interpolate.js';
 import { resolveBranch } from './branch-tags.js';
 import type { InstallerRule } from './installer-engine.js';
@@ -74,6 +81,36 @@ export class GdlRuntime {
     return this.resolvedCtx ?? {};
   }
 
+  // Build DiscoveryFacts from a Vortex IDiscoveryResult.
+  //
+  // Vortex passes a discovery to setup/getGameVersion that already contains the
+  // installPath and store id — every concrete path the extension cares about
+  // can be resolved from that. We must NOT fall back to GameStoreHelper here:
+  // Vortex's own discovery includes sideloaded games and user-edited paths that
+  // findByAppId can't see, and silently falling back was the root cause of
+  // Nexus bug 1086633 ("unbound variable `pakModsPath`").
+  private factsFromDiscovery(discovery: IDiscoveryResult): DiscoveryFacts {
+    const os = process.platform === 'win32' ? 'windows' as const
+             : process.platform === 'darwin' ? 'macos' as const
+             : 'linux' as const;
+    const facts: DiscoveryFacts = {
+      store: discovery.store ?? '',
+      os,
+      arch: process.arch === 'arm64' ? 'arm64' : 'x64',
+      installPath: discovery.path ?? '',
+      executablePath: discovery.path ?? '',
+    };
+    if (os === 'windows') {
+      // Mirror the Windows-only AppData paths populated by discover(); kept in
+      // sync there so both code paths produce the same facts shape.
+      const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
+      facts.appDataLocal    = process.env.LOCALAPPDATA ?? `${home}/AppData/Local`;
+      facts.appDataLocalLow = `${facts.appDataLocal}/../LocalLow`;
+      facts.appDataRoaming  = process.env.APPDATA ?? `${home}/AppData/Roaming`;
+    }
+    return facts;
+  }
+
   registerGame(
     decl: GameDecl,
     stores: StoreDecl[],
@@ -124,11 +161,18 @@ export class GdlRuntime {
       };
     }
     if (setupDirs.length > 0) {
-      game.setup = async () => {
+      game.setup = async (discovery: IDiscoveryResult) => {
         const { fs } = await import('vortex-api');
-        const ctx = await this.ensureContext(stores, contextSpec);
+        // Vortex's discovery is the authoritative source for installPath at
+        // setup time; trust it over our cached/store-helper view so manual and
+        // sideloaded installs resolve correctly. We still cache for later
+        // installer/modtype calls.
+        const facts = this.factsFromDiscovery(discovery);
+        this.cachedFacts = facts;
+        this.resolvedCtx = resolveContext(contextSpec, facts);
+        if (discovery.store) this.discoveredStore = discovery.store;
         for (const tpl of setupDirs) {
-          const path = interpolate(tpl, ctx);
+          const path = interpolate(tpl, this.resolvedCtx);
           await fs.ensureDirWritableAsync(path);
         }
       };
