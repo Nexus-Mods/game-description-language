@@ -8,6 +8,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { buildSourceMap, type LineMapping } from './source-map.js';
 import { renderTestsFile } from './tests-emit.js';
+import { renderTemplatesTestFile } from './templates-emit.js';
 import { extensionId } from '../schema/types.js';
 
 export interface EmittedFile {
@@ -268,6 +269,13 @@ ${eventHooksBody}
   if (testsFile) {
     files.push({ path: 'tests.gen.ts', contents: testsFile });
   }
+
+  // Always emit the template-resolution test: catches unbound-variable and
+  // missing-branch bugs in any game.yaml the moment they're introduced. Free
+  // for every downstream extension — no per-game test code needed.
+  const templatesFile = renderTemplatesTestFile(doc);
+  files.push({ path: 'templates.gen.ts', contents: templatesFile });
+
   return files;
 };
 
