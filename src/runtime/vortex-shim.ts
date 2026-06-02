@@ -209,9 +209,15 @@ export class GdlRuntime {
 
     if (eventHooks.didDeploy) {
       const userHook = eventHooks.didDeploy;
-      this.api.api.events.on('did-deploy', (...args: unknown[]) => {
-        const [profileId, deployment] = args as [string, unknown];
-        void userHook({ profileId, deployment, api: this.api.api });
+      // Per IExtensionContext docs, `api` is only fully initialised once the
+      // `once()` callback fires — accessing `api.events` synchronously here
+      // throws "Cannot read properties of undefined (reading 'on')" on some
+      // Vortex builds (GH issue #6 against game-subnautica2 1.1.0).
+      this.api.once(() => {
+        this.api.api.events.on('did-deploy', (...args: unknown[]) => {
+          const [profileId, deployment] = args as [string, unknown];
+          void userHook({ profileId, deployment, api: this.api.api });
+        });
       });
     }
   }

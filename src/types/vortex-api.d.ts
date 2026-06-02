@@ -12,7 +12,7 @@ declare module 'vortex-api' {
     queryPath: () => Promise<string | { path: string; store?: string }>;
     mergeMods: boolean | ((mod: unknown) => string);
     queryModPath: () => string;
-    setup?: (discovery: { path?: string }) => Promise<void>;
+    setup?: (discovery: { path?: string; store?: string }) => Promise<void>;
     getGameVersion?: (gamePath: string, exePath?: string) => Promise<string>;
     supportedTools?: unknown[];
   }
@@ -83,6 +83,9 @@ declare module 'vortex-api' {
       action: ActionRunFn,
       condition?: ActionVisibilityFn,
     ) => void;
+    // Vortex only populates `api.events` etc. after extension init is done; do
+    // event-listener wiring inside the `once` callback so it runs at that point.
+    once: (callback: () => void | PromiseLike<void>) => void;
     api: {
       getState: () => unknown;
       events: {
