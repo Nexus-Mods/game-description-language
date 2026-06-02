@@ -372,18 +372,37 @@ const parseTestsBlock = (node: YamlNode, file: string, source: string): TestsNod
   // `/games/<game.id>` — e.g. Xbox returns the Content/ parent folder.
   let scenarios: Record<string, { installPath?: string }> | undefined;
   const scenariosYaml = node.get('scenarios', true);
-  if (isMap(scenariosYaml)) {
+  if (scenariosYaml !== undefined && scenariosYaml !== null) {
+    if (!isMap(scenariosYaml)) {
+      throw new BuildErrors([{
+        code: 'GDL082',
+        message: '`tests.scenarios` must be a mapping of storeId → { installPath: ... }',
+        span: spanOf(file, source, scenariosYaml as YamlNode),
+      }]);
+    }
     scenarios = {};
     for (const pair of scenariosYaml.items) {
       if (!isPair(pair)) continue;
       const storeId = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
       const valueNode = pair.value as YamlNode;
-      if (isMap(valueNode)) {
-        const installPath = valueNode.has('installPath')
-          ? String(valueNode.get('installPath'))
-          : undefined;
-        scenarios[storeId] = installPath !== undefined ? { installPath } : {};
+      if (!isMap(valueNode)) {
+        throw new BuildErrors([{
+          code: 'GDL083',
+          message: `\`tests.scenarios.${storeId}\` must be a mapping (e.g. \`{ installPath: /foo }\`)`,
+          span: spanOf(file, source, valueNode),
+        }]);
       }
+      const installPath = valueNode.has('installPath')
+        ? String(valueNode.get('installPath'))
+        : undefined;
+      if (installPath !== undefined && installPath.length === 0) {
+        throw new BuildErrors([{
+          code: 'GDL084',
+          message: `\`tests.scenarios.${storeId}.installPath\` must be a non-empty string`,
+          span: spanOf(file, source, valueNode),
+        }]);
+      }
+      scenarios[storeId] = installPath !== undefined ? { installPath } : {};
     }
   }
 

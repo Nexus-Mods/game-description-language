@@ -273,5 +273,25 @@ export const validate = (doc: DocumentNode): BuildError[] => {
   // events.did-deploy: structural validation done in parser.
   // Hook resolution happens in the build step (alongside discovery.version's hook).
 
+  // tests.scenarios cross-reference: every scenario key must name a declared
+  // store, otherwise the override silently does nothing (the codegen lookup
+  // falls through to the default path) and the operator typo goes unnoticed
+  // until a user files a bug.
+  if (doc.tests?.scenarios) {
+    const declaredStores = new Set(doc.stores?.entries.map(e => e.id) ?? []);
+    for (const key of Object.keys(doc.tests.scenarios)) {
+      if (!declaredStores.has(key as never)) {
+        errors.push({
+          code: 'GDL085',
+          message: `tests.scenarios.${key} references an undeclared store`,
+          span: doc.tests.span,
+          hint: declaredStores.size > 0
+            ? `valid stores: ${[...declaredStores].join(', ')}`
+            : 'declare the store under `stores:` first',
+        });
+      }
+    }
+  }
+
   return errors;
 };
