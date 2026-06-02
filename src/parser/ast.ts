@@ -152,6 +152,11 @@ export interface TestsNode extends Node {
   kind: 'tests';
   corpus: CorpusMode;
   cases: TestCaseNode[];
+  // Per-store install-path fixtures consumed by lifecycle.gen.ts so the
+  // generated lifecycle test exercises a realistic discovery shape per store
+  // (e.g. Xbox passes the Content/ parent as installPath). Map of storeId to
+  // override fields. Missing entries default to `/games/<game.id>`.
+  scenarios?: Record<string, { installPath?: string }>;
 }
 
 export interface TestCaseNode extends Node {

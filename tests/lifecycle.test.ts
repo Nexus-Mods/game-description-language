@@ -15,7 +15,8 @@
 //      template, sending "Open mods folder" to the game root.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { GdlRuntime, createFakeContext, type FakeContextHandle, type FakeIGame } from '../src/runtime/index.js';
+import { GdlRuntime } from '../src/runtime/index.js';
+import { createFakeContext, type FakeContextHandle, type FakeIGame } from '../src/runtime/testing/index.js';
 import type { ContextSpec } from '../src/runtime/context-resolver.js';
 import type { IExtensionContext } from 'vortex-api';
 

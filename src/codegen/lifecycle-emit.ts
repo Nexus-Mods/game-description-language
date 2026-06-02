@@ -41,12 +41,17 @@ const buildSpec = (doc: DocumentNode): ContextSpec => ({
   })),
 });
 
-const buildFacts = (gameId: string, executable: string, store: string): DiscoveryFacts => ({
+const buildFacts = (
+  gameId: string,
+  executable: string,
+  store: string,
+  installPath: string,
+): DiscoveryFacts => ({
   store,
   os: 'windows',
   arch: 'x64',
-  installPath: `/games/${gameId}`,
-  executablePath: `/games/${gameId}/${executable}`,
+  installPath,
+  executablePath: `${installPath}/${executable}`,
 });
 
 interface Scenario {
@@ -60,9 +65,13 @@ const computeScenarios = (doc: DocumentNode): Scenario[] => {
   const spec = buildSpec(doc);
   const stores = doc.stores?.entries.map(e => e.id) ?? ['manual'];
   const setupDirs = doc.setup?.ensureDirs ?? [];
+  const overrides = doc.tests?.scenarios ?? {};
 
   return stores.map(store => {
-    const facts = buildFacts(doc.game.id, doc.game.executable, store);
+    // Use the per-store override if declared; otherwise default to a path that
+    // contains the game id (so absolute-path assertions stay stable).
+    const installPath = overrides[store]?.installPath ?? `/games/${doc.game.id}`;
+    const facts = buildFacts(doc.game.id, doc.game.executable, store, installPath);
     const ctx = resolveContext(spec, facts);
     const expectedSetupDirs = setupDirs.map(t => interpolate(t, ctx));
     const scenario: Scenario = {
@@ -146,7 +155,7 @@ describe(${sq(doc.game.id + ' — lifecycle: did-deploy hook wiring')}, () => {
 // Source: ${doc.game.span.file}
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fs } from 'vortex-api';
-import { createFakeContext } from '@gdl/runtime';
+import { createFakeContext } from '@gdl/runtime/testing';
 import main from './extension.js';
 ${hookImport}
 describe(${sq(doc.game.id + ' — lifecycle')}, () => {${scenarioBlocks}

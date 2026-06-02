@@ -366,10 +366,32 @@ const parseTestsBlock = (node: YamlNode, file: string, source: string): TestsNod
     }
   }
 
+  // Optional per-store lifecycle fixtures: each entry overrides the synthetic
+  // installPath for that store in the generated lifecycle.gen.ts test. Used
+  // when the realistic discovery shape differs from the default
+  // `/games/<game.id>` — e.g. Xbox returns the Content/ parent folder.
+  let scenarios: Record<string, { installPath?: string }> | undefined;
+  const scenariosYaml = node.get('scenarios', true);
+  if (isMap(scenariosYaml)) {
+    scenarios = {};
+    for (const pair of scenariosYaml.items) {
+      if (!isPair(pair)) continue;
+      const storeId = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+      const valueNode = pair.value as YamlNode;
+      if (isMap(valueNode)) {
+        const installPath = valueNode.has('installPath')
+          ? String(valueNode.get('installPath'))
+          : undefined;
+        scenarios[storeId] = installPath !== undefined ? { installPath } : {};
+      }
+    }
+  }
+
   return {
     kind: 'tests',
     corpus,
     cases,
+    ...(scenarios !== undefined && { scenarios }),
     span: spanOf(file, source, node),
   };
 };
