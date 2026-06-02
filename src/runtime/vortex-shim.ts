@@ -71,21 +71,6 @@ export class GdlRuntime {
     this.discoveredStore = store;
   }
 
-  // Lazily resolve context if not already done (handles cached discovery).
-  private async ensureContext(
-    stores: StoreDecl[],
-    contextSpec: ContextSpec,
-  ): Promise<ResolvedContext> {
-    if (!this.resolvedCtx) {
-      const facts = this.cachedFacts ?? await this.discover(stores);
-      if (facts) {
-        this.cachedFacts = facts;
-        this.resolvedCtx = resolveContext(contextSpec, facts);
-      }
-    }
-    return this.resolvedCtx ?? {};
-  }
-
   // Build DiscoveryFacts from a Vortex IDiscoveryResult.
   //
   // Vortex passes a discovery to setup/getGameVersion that already contains the
