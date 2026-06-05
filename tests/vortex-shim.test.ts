@@ -84,6 +84,42 @@ describe('GdlRuntime — installer scope.stores filtering', () => {
     const result = await testFn(['Some/Mod/file.pak'], 'subnautica2');
     expect(result).toMatchObject({ supported: true });
   });
+
+  it('normalizes Vortex backslash paths for GDL planning but keeps raw copy source', async () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+
+    const rule = {
+      id: 'injector-repack',
+      priority: 10,
+      when: { kind: 'hasFile' as const, glob: '**/Win64/dwmapi.dll' },
+      single: {
+        anchor: { kind: 'glob' as const, pattern: '**/Win64/dwmapi.dll' },
+        take: 'self' as const,
+        placeAt: '/ignored-by-vortex',
+      },
+      modType: 'injector',
+    };
+    runtime.registerInstallerRulePublic('gothic1remake', rule);
+
+    const files = [
+      'G1R\\Binaries\\Win64\\dwmapi.dll',
+      'G1R\\Binaries\\Win64\\UE4SS.dll',
+    ];
+    const registerInstaller = ctx.registerInstaller as ReturnType<typeof vi.fn>;
+    const testFn = registerInstaller.mock.calls[0]![2];
+    const installFn = registerInstaller.mock.calls[0]![3];
+
+    await expect(testFn(files, 'gothic1remake')).resolves.toMatchObject({ supported: true });
+    await expect(installFn(files, '', 'gothic1remake')).resolves.toEqual({
+      instructions: [
+        { type: 'copy', source: 'G1R\\Binaries\\Win64\\dwmapi.dll', destination: 'dwmapi.dll' },
+        { type: 'setmodtype', value: 'injector' },
+        { type: 'copy', source: 'G1R\\Binaries\\Win64\\UE4SS.dll', destination: 'UE4SS.dll' },
+        { type: 'setmodtype', value: 'injector' },
+      ],
+    });
+  });
 });
 
 describe('GdlRuntime — lazy modType getPath', () => {

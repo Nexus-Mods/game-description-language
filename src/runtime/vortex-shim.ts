@@ -14,6 +14,8 @@ import type { InstallerRule } from './installer-engine.js';
 import { buildInstallPlan } from './installer-engine.js';
 import { evalPredicateExpr } from './predicate.js';
 
+const normaliseArchivePath = (path: string): string => path.replace(/\\/g, '/');
+
 export interface GameDecl {
   id: string;
   name: string;
@@ -239,20 +241,23 @@ export class GdlRuntime {
           return { supported: false };
         }
       }
+      const normalisedFiles = files.map(normaliseArchivePath);
       const ctx = {
-        archivePaths: files,
+        archivePaths: normalisedFiles,
         vars: this.resolvedCtx ?? {},
       };
       return { supported: evalPredicateExpr(rule.when, ctx) };
     };
 
     const install: InstallFn = async (files, _destinationPath, gid) => {
+      const normalisedFiles = files.map(normaliseArchivePath);
       const ctx = {
-        archivePaths: files,
+        archivePaths: normalisedFiles,
         vars: this.resolvedCtx ?? {},
       };
       if (gid !== gameId) return { instructions: [] };
-      const plan = buildInstallPlan(rule, files, ctx);
+      const rawByNormalised = new Map(files.map(file => [normaliseArchivePath(file), file]));
+      const plan = buildInstallPlan(rule, normalisedFiles, ctx);
       const instructions = plan.flatMap(p => {
         const dest = p.relative;
         if (/^[a-zA-Z]:/.test(dest) || dest.startsWith('/')) {
@@ -263,7 +268,7 @@ export class GdlRuntime {
           );
         }
         return [
-          { type: 'copy' as const, source: p.source, destination: dest },
+          { type: 'copy' as const, source: rawByNormalised.get(p.source) ?? p.source, destination: dest },
           { type: 'setmodtype' as const, value: p.modType },
         ];
       });
