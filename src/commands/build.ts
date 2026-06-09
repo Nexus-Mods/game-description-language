@@ -6,6 +6,7 @@ import { emit, writeEmittedFiles } from '../codegen/emit.js';
 import { runBundler } from '../bundler/index.js';
 import { BuildErrors, formatError } from '../errors.js';
 import { resolveHooks } from '../codegen/hook-resolver.js';
+import { resolveExtensionVersion } from '../version.js';
 import type { DocumentNode, ValueNode } from '../parser/ast.js';
 
 export interface BuildArgs {
@@ -39,11 +40,7 @@ export const buildExtension = async (args: BuildArgs): Promise<void> => {
   const hookErrors = await resolveHooks(args.cwd, collectHookIds(doc));
   if (hookErrors.length) throw new BuildErrors(hookErrors);
 
-  let extensionVersion = '0.0.0';
-  try {
-    const pkg = JSON.parse(await readFile(join(args.cwd, 'package.json'), 'utf8'));
-    if (typeof pkg.version === 'string') extensionVersion = pkg.version;
-  } catch { /* tolerate missing package.json in tests */ }
+  const extensionVersion = await resolveExtensionVersion(doc, args.cwd);
 
   const files = emit(doc, { extensionVersion });
   await writeEmittedFiles(args.cwd, files);

@@ -7,6 +7,8 @@ export interface Node {
 export interface DocumentNode extends Node {
   kind: 'document';
   gdl: number;
+  /** Optional extension version (e.g. "1.2.0"); overrides package.json when present. */
+  version?: string;
   game: GameNode;
   stores?: StoresNode;
   context?: ContextNode;

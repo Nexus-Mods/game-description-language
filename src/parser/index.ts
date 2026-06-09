@@ -521,6 +521,10 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }]);
   }
 
+  // Optional top-level extension version; coerce to string (YAML may parse 1.0 as a number).
+  const versionRaw = root.get('version');
+  const version = versionRaw !== undefined && versionRaw !== null ? String(versionRaw) : undefined;
+
   const gameNode = root.get('game', true);
   if (!isMap(gameNode)) {
     throw new BuildErrors([{
@@ -827,6 +831,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
   return {
     kind: 'document',
     gdl,
+    ...(version !== undefined && { version }),
     game,
     ...(stores          !== undefined && { stores }),
     ...(context         !== undefined && { context }),

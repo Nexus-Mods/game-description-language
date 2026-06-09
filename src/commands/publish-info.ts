@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseYaml } from '../parser/index.js';
 import { extensionId } from '../schema/types.js';
+import { resolveExtensionVersion } from '../version.js';
 
 export type PublishInfoField =
   | 'mod-id'
@@ -18,11 +19,7 @@ export const resolvePublishInfo = async (
   const doc = parseYaml(await readFile(yamlPath, 'utf8'), yamlPath);
 
   if (field === 'version' || field === 'zip-name') {
-    let version = '0.0.0';
-    try {
-      const pkg = JSON.parse(await readFile(join(cwd, 'package.json'), 'utf8'));
-      if (typeof pkg.version === 'string') version = pkg.version;
-    } catch { /* tolerate */ }
+    const version = await resolveExtensionVersion(doc, cwd);
     if (field === 'version') return version;
     return `${extensionId(doc.game.id)}-vortex-v${version}.zip`;
   }
