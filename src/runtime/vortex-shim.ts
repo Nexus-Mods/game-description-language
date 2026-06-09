@@ -11,8 +11,7 @@ interface IDiscoveryResult {
 import { interpolate } from './interpolate.js';
 import { resolveBranch } from './branch-tags.js';
 import type { InstallerRule } from './installer-engine.js';
-import { buildInstallPlan } from './installer-engine.js';
-import { evalPredicateExpr } from './predicate.js';
+import { buildInstallPlan, ruleSupports } from './installer-engine.js';
 
 const normaliseArchivePath = (path: string): string => path.replace(/\\/g, '/');
 
@@ -246,7 +245,10 @@ export class GdlRuntime {
         archivePaths: normalisedFiles,
         vars: this.resolvedCtx ?? {},
       };
-      return { supported: evalPredicateExpr(rule.when, ctx) };
+      // Honor `unless` here too: otherwise a higher-priority rule whose `when`
+      // matches but whose `unless` excludes the archive would claim support and
+      // then build an empty plan, which Vortex reports as a canceled install.
+      return { supported: ruleSupports(rule, ctx) };
     };
 
     const install: InstallFn = async (files, _destinationPath, gid) => {

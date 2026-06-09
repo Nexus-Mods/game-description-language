@@ -125,13 +125,27 @@ const matches = (p: Pattern, path: string): boolean => {
   return new RegExp(p.pattern).test(path);
 };
 
+/**
+ * Whether a rule applies to an archive: its `when` matches AND its `unless`
+ * (if any) does not. This is the single source of truth for "does this installer
+ * support this archive" — both the Vortex `testSupported` shim and
+ * `buildInstallPlan` use it, so an installer never claims support for an archive
+ * it would then refuse to build a plan for (which Vortex reports as a canceled
+ * install).
+ */
+export const ruleSupports = (
+  rule: InstallerRule,
+  ctx: EvalContext,
+): boolean =>
+  evalPredicateExpr(rule.when, ctx)
+  && !(rule.unless !== undefined && evalPredicateExpr(rule.unless, ctx));
+
 export const buildInstallPlan = (
   rule: InstallerRule,
   archivePaths: readonly string[],
   ctx: EvalContext,
 ): InstallInstruction[] => {
-  if (!evalPredicateExpr(rule.when, ctx)) return [];
-  if (rule.unless !== undefined && evalPredicateExpr(rule.unless, ctx)) return [];
+  if (!ruleSupports(rule, ctx)) return [];
 
   if (rule.single) {
     const matcher = compileGlob(rule.single.anchor.pattern);
