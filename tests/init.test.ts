@@ -5,24 +5,33 @@ import { join } from 'node:path';
 import { initExtension } from '../src/commands/init.js';
 
 describe('initExtension', () => {
-  it('scaffolds an extension repo with all template files', async () => {
+  it('scaffolds only a game.yaml (root-driven monorepo layout)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gdl-init-'));
     await initExtension({ cwd: dir, gameId: 'subnautica2', gameName: 'Subnautica 2' });
 
-    for (const f of ['game.yaml', 'package.json', '.gitignore', 'README.md', '.github/workflows/ci.yml']) {
-      expect(existsSync(join(dir, f))).toBe(true);
+    expect(existsSync(join(dir, 'game.yaml'))).toBe(true);
+
+    // The repo root provides these — init must NOT emit per-game copies.
+    for (const f of ['package.json', '.gitignore', 'README.md', '.github/workflows/ci.yml']) {
+      expect(existsSync(join(dir, f))).toBe(false);
     }
 
     const gameYaml = readFileSync(join(dir, 'game.yaml'), 'utf8');
+    expect(gameYaml).toContain('gdl: 1');
+    expect(gameYaml).toContain('version: 0.0.1');     // version lives in game.yaml now
     expect(gameYaml).toContain('id: subnautica2');
-    expect(gameYaml).toContain('displayName: Subnautica 2 Support for Vortex');
+    expect(gameYaml).toContain('nexusDomain: subnautica2');
+    // The nexus block ships commented out (GDL rejects 0/placeholder ids at build).
+    expect(gameYaml).not.toMatch(/^\s*modId:/m);
+  });
 
-    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-    expect(pkg.name).toBe('game-subnautica2');
-
-    const ci = readFileSync(join(dir, '.github/workflows/ci.yml'), 'utf8');
-    expect(ci).toContain('uses: Nexus-Mods/game-description-language/.github/workflows/test.yml@gdl-mvp');
-    expect(ci).toContain('uses: Nexus-Mods/game-description-language/.github/workflows/release.yml@gdl-mvp');
+  it('produces a game.yaml that builds (no required nexus/logo)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gdl-init-build-'));
+    await initExtension({ cwd: dir, gameId: 'helloworld', gameName: 'Hello World' });
+    const gameYaml = readFileSync(join(dir, 'game.yaml'), 'utf8');
+    // No active logo or nexus block means a fresh scaffold builds without extra files.
+    expect(gameYaml).not.toMatch(/^\s*logo:/m);
+    expect(gameYaml).not.toMatch(/^\s*nexus:/m);
   });
 
   it('refuses to overwrite an existing game.yaml', async () => {
@@ -30,17 +39,5 @@ describe('initExtension', () => {
     await initExtension({ cwd: dir, gameId: 'foo', gameName: 'Foo' });
     await expect(initExtension({ cwd: dir, gameId: 'foo', gameName: 'Foo' }))
       .rejects.toThrow(/already exists/);
-  });
-
-  it('CI workflow uses the published GDL workflows by ref (not local-path)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'gdl-init-ci-'));
-    await initExtension({ cwd: dir, gameId: 'helloworld', gameName: 'Hello World' });
-
-    const ci = readFileSync(join(dir, '.github/workflows/ci.yml'), 'utf8');
-    expect(ci).toContain('uses: Nexus-Mods/game-description-language/.github/workflows/test.yml@gdl-mvp');
-    expect(ci).toContain('uses: Nexus-Mods/game-description-language/.github/workflows/release.yml@gdl-mvp');
-    // Make sure the broken form does NOT appear
-    expect(ci).not.toContain('./gdl/.github/workflows/test.yml@');
-    expect(ci).not.toContain('./gdl/.github/workflows/release.yml@');
   });
 });

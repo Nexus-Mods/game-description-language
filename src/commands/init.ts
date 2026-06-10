@@ -28,11 +28,7 @@ const substitute = (content: string, args: InitArgs): string =>
     .replace(/\{\{GAME_NAME\}\}/g, args.gameName);
 
 const TEMPLATES: { src: string; dst: string }[] = [
-  { src: 'game.yaml.tmpl',     dst: 'game.yaml' },
-  { src: 'package.json.tmpl',  dst: 'package.json' },
-  { src: 'gitignore.tmpl',     dst: '.gitignore' },
-  { src: 'README.md.tmpl',     dst: 'README.md' },
-  { src: 'ci.yml.tmpl',        dst: '.github/workflows/ci.yml' },
+  { src: 'game.yaml.tmpl', dst: 'game.yaml' },
 ];
 
 export const initExtension = async (args: InitArgs): Promise<void> => {

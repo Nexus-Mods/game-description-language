@@ -85,14 +85,14 @@ program
 
 program
   .command('init <gameId>')
-  .description('Scaffold a new GDL extension repo for a game')
+  .description("Scaffold a new game's game.yaml (run from the game's folder)")
   .option('-n, --name <name>', 'human-friendly game name', '')
   .action(async (gameId: string, opts: { name?: string }) => {
     try {
       const gameName = opts.name && opts.name.trim() ? opts.name : gameId;
       await initExtension({ cwd: process.cwd(), gameId, gameName });
-      process.stdout.write(`Scaffolded ${gameId} in ${process.cwd()}\n`);
-      process.stdout.write(`Next: add the GDL submodule with: git submodule add https://github.com/Nexus-Mods/game-description-language gdl\n`);
+      process.stdout.write(`Scaffolded game.yaml for ${gameId} in ${process.cwd()}\n`);
+      process.stdout.write(`Next: add a gameart.webp, fill in stores + the nexus block, then build.\n`);
     } catch (err) {
       process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
       process.exit(1);
