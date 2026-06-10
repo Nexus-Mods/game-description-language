@@ -1,6 +1,42 @@
-import type { DocumentNode } from '../parser/ast.js';
+import type { DocumentNode, ValueNode } from '../parser/ast.js';
 import type { BuildError } from '../errors.js';
 import { SUPPORTED_SCHEMA_VERSIONS, ID_PATTERN } from './types.js';
+
+// Resolve a ValueNode to a canonical template string by expanding ${var}
+// references against the context bindings (taking the default arm for branches).
+// Built-in/runtime vars (installPath, store, …) have no binding and are kept
+// verbatim, so two values that reference the same vars flatten identically.
+// Returns null if it bottoms out in a hook reference (unresolvable at build time).
+const expandTemplate = (
+  template: string,
+  bindings: Map<string, ValueNode>,
+  seen: Set<string>,
+): string | null => {
+  let unresolved = false;
+  const out = template.replace(/\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (m, name: string) => {
+    const binding = bindings.get(name);
+    if (!binding || seen.has(name)) return m; // runtime built-in or cycle: keep literal
+    const nested = flattenValue(binding, bindings, new Set(seen).add(name));
+    if (nested === null) { unresolved = true; return m; }
+    return nested;
+  });
+  return unresolved ? null : out;
+};
+
+const flattenValue = (
+  v: ValueNode,
+  bindings: Map<string, ValueNode>,
+  seen: Set<string> = new Set(),
+): string | null => {
+  switch (v.kind) {
+    case 'literal':       return String(v.raw);
+    case 'interpolated':  return expandTemplate(v.template, bindings, seen);
+    case 'storeBranch':
+    case 'osBranch':
+    case 'versionBranch': return flattenValue(v.default, bindings, seen);
+    case 'hookRef':       return null;
+  }
+};
 
 export const validate = (doc: DocumentNode): BuildError[] => {
   const errors: BuildError[] = [];
@@ -83,7 +119,32 @@ export const validate = (doc: DocumentNode): BuildError[] => {
 
   if (doc.installers) {
     const declaredModTypes = new Set((doc.modTypes ?? []).map(mt => mt.id));
+    const modTypePathById = new Map((doc.modTypes ?? []).map(mt => [mt.id, mt.path] as const));
+    const bindings = new Map((doc.context?.bindings ?? []).map(b => [b.name, b.value] as const));
     const seenIds = new Set<string>();
+
+    // Vortex deploys a mod to its modType's `path` (+ the installer's stripped
+    // relative path); `placeAt` is only the test harness's stand-in for that
+    // root. If the two resolve to different folders, every test passes while the
+    // real install lands in the wrong place (e.g. a doubled LogicMods/LogicMods).
+    const checkPlaceAt = (placeAt: ValueNode, modTypeId: string, span: typeof doc.span, label: string): void => {
+      const mtPath = modTypePathById.get(modTypeId);
+      if (!mtPath) return; // undeclared modType already reported as GDL110
+      const at = flattenValue(placeAt, bindings);
+      const to = flattenValue(mtPath, bindings);
+      if (at === null || to === null || at === to) return;
+      // `.`/empty means "defer to the modType path" — runtime ignores placeAt
+      // and deploys to the modType path regardless, so this can never disagree;
+      // it only opts the test out of asserting an absolute destination.
+      if (at === '.' || at === '') return;
+      errors.push({
+        code: 'GDL114',
+        message: `${label} places files at \`${at}\` but its modType \`${modTypeId}\` deploys to \`${to}\` — these must resolve to the same path`,
+        span,
+        hint: 'Vortex deploys to the modType path at runtime; `placeAt` is only the test-time root. Point them at the same folder.',
+      });
+    };
+
     for (const inst of doc.installers) {
       if (!ID_PATTERN.test(inst.id)) {
         errors.push({
@@ -122,6 +183,7 @@ export const validate = (doc: DocumentNode): BuildError[] => {
               : 'no modTypes declared',
           });
         }
+        checkPlaceAt(inst.single!.placeAt, mt, inst.span, `installer \`${inst.id}\``);
       }
       if (hasRoute) {
         for (const r of inst.route!) {
@@ -132,6 +194,7 @@ export const validate = (doc: DocumentNode): BuildError[] => {
               span: r.span,
             });
           }
+          checkPlaceAt(r.placeAt, r.modType, r.span, `route entry in installer \`${inst.id}\``);
         }
       }
     }

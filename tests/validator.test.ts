@@ -399,4 +399,87 @@ events:
     const errors = validate(doc);
     expect(errors).toEqual([]);
   });
+
+  // GDL114: an installer's placeAt is only the TEST-time deploy root; at runtime
+  // Vortex deploys to the matched modType's `path` (+ the stripped relative path).
+  // If they resolve differently the test harness passes while the real install
+  // lands in the wrong folder (e.g. a doubled LogicMods/LogicMods). Catch it at
+  // build time.
+  it('rejects an installer whose placeAt resolves differently from its modType path', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+context:
+  paksPath: \${installPath}/Content/Paks
+  logicPath: \${installPath}/Content/Paks/LogicMods
+modTypes:
+  - { id: logic, name: Logic, path: "\${logicPath}" }
+installers:
+  - id: logicmods
+    priority: 20
+    when: { hasFile: "**/LogicMods/**" }
+    anchor: "**/LogicMods/"
+    take: self
+    placeAt: "\${paksPath}"
+    modType: logic
+`);
+    const errors = validate(doc);
+    expect(errors.map(e => e.code)).toContain('GDL114');
+  });
+
+  it('accepts an installer whose placeAt matches its modType path', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+context:
+  logicPath: \${installPath}/Content/Paks/LogicMods
+modTypes:
+  - { id: logic, name: Logic, path: "\${logicPath}" }
+installers:
+  - id: logicmods
+    priority: 20
+    when: { hasFile: "**/LogicMods/**" }
+    anchor: "**/LogicMods/"
+    take: self
+    placeAt: "\${logicPath}"
+    modType: logic
+`);
+    expect(validate(doc).map(e => e.code)).not.toContain('GDL114');
+  });
+
+  // placeAt "." (or empty) means "defer to the modType path" — the runtime
+  // already deploys to the modType path, so "." can never disagree with it. It
+  // only opts the test out of asserting an absolute destination, so it must NOT
+  // trip GDL114 (unlike a concrete placeAt that resolves to a different folder).
+  it('does not flag GDL114 when placeAt is "." (defers to the modType path)', () => {
+    const doc = tinyDoc(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+context:
+  modRoot: \${appDataLocalLow}/Game/Game
+modTypes:
+  - { id: mod, name: Mod, path: "\${modRoot}" }
+installers:
+  - id: mod
+    priority: 20
+    when: { hasFile: "**/Main.mod/**" }
+    anchor: "**/Main.mod/"
+    take: parent
+    placeAt: "."
+    modType: mod
+`);
+    expect(validate(doc).map(e => e.code)).not.toContain('GDL114');
+  });
 });
