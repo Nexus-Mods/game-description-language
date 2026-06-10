@@ -6,6 +6,8 @@ export interface CorpusEntry {
   matchedInstaller?: string;
   matchedModType?: string;
   planSize: number;
+  /** Full install plan of the matched installer; used by placement validators. */
+  plan?: readonly InstallInstruction[];
   error?: string;
 }
 
@@ -29,8 +31,19 @@ export const runCorpus = (
   const entries: CorpusEntry[] = [];
   let matched = 0, unmatched = 0, failed = 0;
 
+  // Drop installers whose `scope.stores` excludes the active store — mirrors the
+  // Vortex shim's `testSupported` gate (vortex-shim.ts) so the corpus reflects what
+  // the published extension would actually do for this store. An unscoped rule always
+  // applies; a scoped rule applies only when the active store is one it lists (and is
+  // dropped entirely when no store is set, matching the shim's no-`discoveredStore` path).
+  const activeStore = opts.vars.store;
+  const inScope = (r: InstallerRule): boolean => {
+    const stores = r.scope?.stores;
+    if (!stores || stores.length === 0) return true;
+    return typeof activeStore === 'string' && stores.includes(activeStore);
+  };
   // Lower priority number = earlier; same convention as the engine.
-  const sortedRules = [...rules].sort((a, b) => a.priority - b.priority);
+  const sortedRules = [...rules].filter(inScope).sort((a, b) => a.priority - b.priority);
 
   for (const archive of archivePaths) {
     try {
@@ -48,6 +61,7 @@ export const runCorpus = (
           archive,
           planSize: plan.length,
           matchedInstaller: matchedRule.id,
+          plan,
           ...(modType !== undefined && { matchedModType: modType }),
         });
         matched++;

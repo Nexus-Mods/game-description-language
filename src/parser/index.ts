@@ -5,7 +5,7 @@ import type {
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
   FileVersionNode, VersionSourceNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode,
-  ValidatorNode, ValidatorAssertNode,
+  ValidatorNode, ValidatorAssertNode, PlacementAssertNode,
   NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
@@ -441,10 +441,37 @@ const parseValidatorsBlock = (node: YamlNode, file: string, source: string): Val
     if (isMap(assertYaml)) {
       const matched = assertYaml.has('matched') ? String(assertYaml.get('matched')) : undefined;
       const modType = assertYaml.has('modType') ? String(assertYaml.get('modType')) : undefined;
+      const placementYaml = assertYaml.get('placement', true);
+      let placement: PlacementAssertNode[] | undefined;
+      if (placementYaml !== undefined && placementYaml !== null) {
+        if (!isSeq(placementYaml)) {
+          throw new BuildErrors([{
+            code: 'GDL176',
+            message: '`validators[].assert.placement` must be a sequence',
+            span: spanOf(file, source, placementYaml as YamlNode),
+          }]);
+        }
+        placement = placementYaml.items.map((p) => {
+          if (!isMap(p)) {
+            throw new BuildErrors([{
+              code: 'GDL177',
+              message: '`validators[].assert.placement[]` entries must be mappings',
+              span: spanOf(file, source, p as YamlNode),
+            }]);
+          }
+          return {
+            files: p.has('files') ? String(p.get('files')) : '',
+            ...(p.has('mustMatch') && { mustMatch: String(p.get('mustMatch')) }),
+            ...(p.has('mustNotMatch') && { mustNotMatch: String(p.get('mustNotMatch')) }),
+            span: spanOf(file, source, p as YamlNode),
+          };
+        });
+      }
       assert = {
         kind: 'validatorAssert',
         ...(matched !== undefined && { matched }),
         ...(modType !== undefined && { modType }),
+        ...(placement !== undefined && { placement }),
         span: spanOf(file, source, assertYaml as YamlNode),
       };
     } else {

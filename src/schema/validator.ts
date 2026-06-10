@@ -204,6 +204,26 @@ export const validate = (doc: DocumentNode): BuildError[] => {
           span: v.assert.span,
         });
       }
+      for (const p of v.assert.placement ?? []) {
+        if (!p.files.trim()) {
+          errors.push({
+            code: 'GDL174',
+            message: `validator \`${v.id}\` placement entry is missing \`files\``,
+            span: p.span,
+          });
+        }
+        // An empty-string glob is treated as unspecified: a blank `mustMatch` would
+        // otherwise match nothing and silently fail every targeted file.
+        const hasMatch = p.mustMatch !== undefined && p.mustMatch.trim() !== '';
+        const hasNotMatch = p.mustNotMatch !== undefined && p.mustNotMatch.trim() !== '';
+        if (!hasMatch && !hasNotMatch) {
+          errors.push({
+            code: 'GDL175',
+            message: `validator \`${v.id}\` placement entry must specify a non-empty \`mustMatch\` and/or \`mustNotMatch\``,
+            span: p.span,
+          });
+        }
+      }
     }
   }
 

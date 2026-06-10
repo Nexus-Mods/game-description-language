@@ -36,6 +36,19 @@ describe('runCorpus', () => {
     expect(report.entries[0]?.planSize).toBe(2);
   });
 
+  it('skips installers whose scope.stores excludes the active store', () => {
+    const epicOnly: InstallerRule = { ...pakRule, scope: { stores: ['epic'] } };
+    const archive = join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.zip');
+
+    const steam = runCorpus([epicOnly], [archive], { vars: { store: 'steam' } });
+    expect(steam.matched).toBe(0);
+    expect(steam.unmatched).toBe(1);
+
+    const epic = runCorpus([epicOnly], [archive], { vars: { store: 'epic' } });
+    expect(epic.matched).toBe(1);
+    expect(epic.entries[0]?.matchedInstaller).toBe('pak');
+  });
+
   it('reports unmatched archives without failing the run', () => {
     const onlyLua: InstallerRule = {
       ...pakRule,

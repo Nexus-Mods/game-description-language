@@ -338,6 +338,53 @@ setup:
     expect(errors).toEqual([]);
   });
 
+  const docWithValidator = (assertYaml: string) => tinyDoc(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+modTypes:
+  - { id: pak, name: Pak Mod, path: /a }
+installers:
+  - id: pak
+    priority: 10
+    when: { hasFile: "**/*.pak" }
+    anchor: "**/*.pak"
+    take: parent
+    placeAt: /a
+    modType: pak
+validators:
+  - id: pak-placement
+    name: pak placement
+    when: { hasFile: "**/*.pak" }
+    assert:
+${assertYaml}
+`);
+
+  it('accepts a validator with a well-formed placement assertion', () => {
+    const doc = docWithValidator(`      placement:
+        - files: "**/*.pak"
+          mustMatch: "**/Paks/**"
+          mustNotMatch: "\${installPath}/*"`);
+    expect(validate(doc)).toEqual([]);
+  });
+
+  it('rejects a placement entry missing files (GDL174)', () => {
+    const doc = docWithValidator(`      placement:
+        - mustMatch: "**/Paks/**"`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL174')).toBe(true);
+  });
+
+  it('rejects a placement entry with neither mustMatch nor mustNotMatch (GDL175)', () => {
+    const doc = docWithValidator(`      placement:
+        - files: "**/*.pak"`);
+    const errors = validate(doc);
+    expect(errors.some(e => e.code === 'GDL175')).toBe(true);
+  });
+
   it('accepts events.did-deploy with hook reference', () => {
     const doc = tinyDoc(`
 gdl: 1

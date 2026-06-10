@@ -183,10 +183,18 @@ export interface ValidatorNode extends Node {
   assert: ValidatorAssertNode;
 }
 
+export interface PlacementAssertNode {
+  files: string;                  // glob over each plan instruction's source path
+  mustMatch?: string;             // resolved destination must match this glob
+  mustNotMatch?: string;          // resolved destination must NOT match this glob
+  span: YamlSpan;
+}
+
 export interface ValidatorAssertNode extends Node {
   kind: 'validatorAssert';
   matched?: string;               // expected installer id
   modType?: string;                // expected mod type
+  placement?: PlacementAssertNode[]; // per-file destination assertions
 }
 
 export interface NexusNode extends Node {

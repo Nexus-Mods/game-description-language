@@ -1,5 +1,14 @@
 import { evalPredicateExpr, type PredicateExpr } from '../runtime/predicate.js';
+import { compileGlob } from '../runtime/glob.js';
+import { interpolate } from '../runtime/interpolate.js';
 import type { CorpusEntry } from './runner.js';
+
+/** A single placement assertion: files matching `files` must (not) land at a destination. */
+export interface PlacementAssert {
+  files: string;          // glob over each plan instruction's source path
+  mustMatch?: string;     // resolved destination must match this glob (var-interpolated)
+  mustNotMatch?: string;  // resolved destination must NOT match this glob (var-interpolated)
+}
 
 export interface ValidatorDef {
   id: string;
@@ -8,6 +17,7 @@ export interface ValidatorDef {
   assert: {
     matched?: string;
     modType?: string;
+    placement?: readonly PlacementAssert[];
   };
 }
 
@@ -63,6 +73,38 @@ export const runValidators = (
         failures.push(
           `expected modType \`${v.assert.modType}\`, got \`${entry.matchedModType ?? '<none>'}\``,
         );
+      }
+
+      for (const rule of v.assert.placement ?? []) {
+        const fileMatcher = compileGlob(rule.files);
+        const targeted = (entry.plan ?? []).filter(i => fileMatcher(i.source));
+
+        if (rule.mustMatch !== undefined) {
+          const want = compileGlob(interpolate(rule.mustMatch, vars));
+          if (targeted.length === 0) {
+            failures.push(
+              `placement[\`${rule.files}\`]: no installed file matches \`${rule.files}\`, expected destination under \`${rule.mustMatch}\``,
+            );
+          }
+          for (const i of targeted) {
+            if (!want(i.destination)) {
+              failures.push(
+                `placement[\`${rule.files}\`]: \`${i.destination}\` must match \`${rule.mustMatch}\``,
+              );
+            }
+          }
+        }
+
+        if (rule.mustNotMatch !== undefined) {
+          const forbidden = compileGlob(interpolate(rule.mustNotMatch, vars));
+          for (const i of targeted) {
+            if (forbidden(i.destination)) {
+              failures.push(
+                `placement[\`${rule.files}\`]: \`${i.destination}\` must not match \`${rule.mustNotMatch}\``,
+              );
+            }
+          }
+        }
       }
 
       if (failures.length === 0) {
