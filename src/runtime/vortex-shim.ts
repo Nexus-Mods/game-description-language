@@ -21,7 +21,6 @@ export interface GameDecl {
   executable: string;
   requiredFiles: string[];
   logo?: string;
-  contributedBy?: string;
   nexusDomain?: string;
   details?: Record<string, unknown>;
   // Template like `${pakModsPath}` resolved against the runtime context to
@@ -119,7 +118,6 @@ export class GdlRuntime {
       executable: () => decl.executable,
       requiredFiles: decl.requiredFiles,
       ...(decl.logo          !== undefined && { logo:        decl.logo }),
-      ...(decl.contributedBy !== undefined && { contributed: decl.contributedBy }),
       details: {
         ...(decl.nexusDomain !== undefined && { nexusPageId: decl.nexusDomain }),
         ...decl.details,

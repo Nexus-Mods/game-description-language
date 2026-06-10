@@ -38,6 +38,31 @@ describe('emit', () => {
     const parsed = JSON.parse(info!.contents);
     expect(parsed).toMatchObject({ id: 'helloworld', name: 'Hello World', version: '0.1.0' });
   });
+
+  // Vortex reads the extension author from info.json (gamemode_management derives
+  // game.contributed and official-vs-community status from it). The old
+  // `contributedBy` -> registerGame(contributed) path is dead: Vortex overwrites
+  // game.contributed from info.json, so author must land in info.json.
+  it('emits game.author into info.json, and omits it when absent', () => {
+    const withAuthor = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+  author: Nexus Mods
+`, 'a.yaml');
+    const info = JSON.parse(
+      emit(withAuthor, { extensionVersion: '0.1.0' }).find(f => f.path.endsWith('info.json'))!.contents,
+    );
+    expect(info.author).toBe('Nexus Mods');
+
+    const noAuthor = JSON.parse(
+      emit(parseYaml(TINY, 'tiny.yaml'), { extensionVersion: '0.1.0' }).find(f => f.path.endsWith('info.json'))!.contents,
+    );
+    expect(noAuthor.author).toBeUndefined();
+  });
 });
 
 describe('emit installers', () => {

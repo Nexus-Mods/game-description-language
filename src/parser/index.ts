@@ -596,7 +596,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     executable: String(gameNode.get('executable') ?? ''),
     requiredFiles,
     ...(gameNode.has('logo')          && { logo:          String(gameNode.get('logo')) }),
-    ...(gameNode.has('contributedBy') && { contributedBy: String(gameNode.get('contributedBy')) }),
+    ...(gameNode.has('author')        && { author:        String(gameNode.get('author')) }),
     ...(gameNode.has('nexusDomain')   && { nexusDomain:   String(gameNode.get('nexusDomain')) }),
     ...(gameNode.has('queryModPath')  && { queryModPath:  String(gameNode.get('queryModPath')) }),
     ...(details !== undefined && Object.keys(details).length > 0 && { details }),

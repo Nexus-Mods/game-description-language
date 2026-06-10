@@ -30,7 +30,9 @@ export interface GameNode extends Node {
   executable: string;
   requiredFiles: string[];
   logo?: string;
-  contributedBy?: string;
+  // Extension author. Emitted into info.json, where Vortex reads it to derive
+  // game.contributed and official-vs-community status (see gamemode_management).
+  author?: string;
   nexusDomain?: string;
   details?: Record<string, string | number | boolean | string[]>;
   // Template resolved against the runtime context to produce the path Vortex
