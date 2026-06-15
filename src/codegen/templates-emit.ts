@@ -116,6 +116,12 @@ describe(${sq(doc.game.id + ' — template resolution')}, () => {
         arch: 'x64',
         installPath: ${sq('/games/' + doc.game.id)},
         executablePath: ${sq('/games/' + doc.game.id + '/' + doc.game.executable)},
+        // Optional discovery facts Vortex supplies at runtime. Provided here so
+        // templates that legitimately reference user-data roots (e.g. mods that
+        // deploy to LocalLow) resolve instead of tripping the unbound-var guard.
+        appDataRoaming: '/appdata/Roaming',
+        appDataLocal: '/appdata/Local',
+        appDataLocalLow: '/appdata/LocalLow',
       };
 
       it('context bindings resolve without unbound variables', () => {

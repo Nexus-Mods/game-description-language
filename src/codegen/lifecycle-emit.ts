@@ -52,6 +52,12 @@ const buildFacts = (
   arch: 'x64',
   installPath,
   executablePath: `${installPath}/${executable}`,
+  // Optional discovery facts Vortex supplies at runtime — provided so games that
+  // deploy to user-data roots (LocalLow/Roaming) resolve their setup dirs and
+  // queryModPath instead of throwing an unbound-variable error at codegen.
+  appDataRoaming: '/appdata/Roaming',
+  appDataLocal: '/appdata/Local',
+  appDataLocalLow: '/appdata/LocalLow',
 });
 
 interface Scenario {
