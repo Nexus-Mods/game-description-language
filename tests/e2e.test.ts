@@ -13,13 +13,13 @@ describe('end-to-end', () => {
 
     await buildExtension({ cwd: work });
 
-    expect(existsSync(join(work, 'dist', 'extension.js'))).toBe(true);
+    expect(existsSync(join(work, 'dist', 'index.js'))).toBe(true);
     expect(existsSync(join(work, 'dist', 'info.json'))).toBe(true);
 
     const info = JSON.parse(readFileSync(join(work, 'dist', 'info.json'), 'utf8'));
     expect(info).toMatchObject({ id: 'helloworld', name: 'Hello World', version: '0.1.0' });
 
-    const bundle = readFileSync(join(work, 'dist', 'extension.js'), 'utf8');
+    const bundle = readFileSync(join(work, 'dist', 'index.js'), 'utf8');
     expect(bundle).toMatch(/helloworld/);
     expect(bundle).toMatch(/Pak Mod/);
     expect(bundle).toMatch(/registerInstaller/);
@@ -43,11 +43,11 @@ describe('end-to-end (subnautica2-shaped)', () => {
 
     await buildExtension({ cwd: work });
 
-    expect(existsSync(join(work, 'dist', 'extension.js'))).toBe(true);
-    expect(existsSync(join(work, 'dist', 'extension.js.map'))).toBe(true);
+    expect(existsSync(join(work, 'dist', 'index.js'))).toBe(true);
+    expect(existsSync(join(work, 'dist', 'index.js.map'))).toBe(true);
     expect(existsSync(join(work, 'dist', 'info.json'))).toBe(true);
 
-    const bundle = readFileSync(join(work, 'dist', 'extension.js'), 'utf8');
+    const bundle = readFileSync(join(work, 'dist', 'index.js'), 'utf8');
     expect(bundle).toMatch(/registerInstaller/);
     expect(bundle).toMatch(/['"]ue4ss-lua['"]/);
     expect(bundle).toMatch(/['"]logic-mod['"]/);
@@ -95,14 +95,22 @@ describe('end-to-end (subnautica2-shaped)', () => {
 });
 
 describe('end-to-end (generated tests run)', () => {
-  it('vitest can execute the generated tests.gen.ts and the inline cases pass', async () => {
+  it('vitest can execute the generated tests.gen.ts and the inline cases pass', async (ctx) => {
     const work = mkdtempSync(join(tmpdir(), 'gdl-run-tests-'));
     cpSync(join(import.meta.dirname, 'fixtures', 'e2e'), work, { recursive: true });
 
     // Symlink <work>/gdl → the GDL repo root so the relative
     // `../gdl/src/runtime/index.js` import in tests.gen.ts resolves.
     const gdlRoot = resolve(import.meta.dirname, '..');
-    symlinkSync(gdlRoot, join(work, 'gdl'), 'dir');
+    try {
+      symlinkSync(gdlRoot, join(work, 'gdl'), 'dir');
+    } catch (e) {
+      // Windows requires admin/Developer Mode to create symlinks. Skip there
+      // rather than fail; this test still runs fully in (Linux) CI.
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === 'EPERM' || code === 'EACCES') return ctx.skip();
+      throw e;
+    }
 
     // Build the extension; this emits .gdl-out/tests.gen.ts.
     await buildExtension({ cwd: work });
@@ -177,8 +185,8 @@ describe('end-to-end (package)', () => {
     const AdmZip = (await import('adm-zip')).default;
     const zip = new AdmZip(result.archivePath);
     const names = zip.getEntries().map(e => e.entryName).sort();
-    // dist/ contains extension.js + extension.js.map + info.json (per current emit).
-    expect(names).toContain('extension.js');
+    // dist/ contains index.js + index.js.map + info.json (per current emit).
+    expect(names).toContain('index.js');
     expect(names).toContain('info.json');
   }, 60000);
 });

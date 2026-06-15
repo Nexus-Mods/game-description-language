@@ -19,8 +19,8 @@ describe('buildInstallPlan — single form', () => {
     const archive = ['MyMod/CoolPak.pak', 'MyMod/Readme.md'];
     const plan = buildInstallPlan(rule, archive, { ...ctx, archivePaths: archive });
     expect(plan).toEqual([
-      { source: 'MyMod/CoolPak.pak', destination: '/games/Hello/Mods/CoolPak.pak', modType: 'pak' },
-      { source: 'MyMod/Readme.md',   destination: '/games/Hello/Mods/Readme.md',   modType: 'pak' },
+      { source: 'MyMod/CoolPak.pak', destination: '/games/Hello/Mods/CoolPak.pak', modType: 'pak', relative: 'CoolPak.pak' },
+      { source: 'MyMod/Readme.md',   destination: '/games/Hello/Mods/Readme.md',   modType: 'pak', relative: 'Readme.md' },
     ]);
   });
 
@@ -39,8 +39,8 @@ describe('buildInstallPlan — single form', () => {
     const archive = ['MyMod/LogicMods/BPFolder/X.pak', 'MyMod/LogicMods/Y.pak', 'MyMod/Readme.md'];
     const plan = buildInstallPlan(rule, archive, { ...ctx, archivePaths: archive });
     expect(plan).toEqual([
-      { source: 'MyMod/LogicMods/BPFolder/X.pak', destination: '/games/Hello/Mods/LogicMods/BPFolder/X.pak', modType: 'logic-mod' },
-      { source: 'MyMod/LogicMods/Y.pak',          destination: '/games/Hello/Mods/LogicMods/Y.pak',          modType: 'logic-mod' },
+      { source: 'MyMod/LogicMods/BPFolder/X.pak', destination: '/games/Hello/Mods/LogicMods/BPFolder/X.pak', modType: 'logic-mod', relative: 'LogicMods/BPFolder/X.pak' },
+      { source: 'MyMod/LogicMods/Y.pak',          destination: '/games/Hello/Mods/LogicMods/Y.pak',          modType: 'logic-mod', relative: 'LogicMods/Y.pak' },
     ]);
   });
 
@@ -59,9 +59,9 @@ describe('buildInstallPlan — single form', () => {
     const archive = ['Outer/MyMod/Scripts/main.lua', 'Outer/MyMod/Scripts/util.lua', 'Outer/MyMod/extras.txt'];
     const plan = buildInstallPlan(rule, archive, { ...ctx, archivePaths: archive });
     expect(plan).toEqual([
-      { source: 'Outer/MyMod/Scripts/main.lua', destination: '/games/Hello/Mods/MyMod/Scripts/main.lua', modType: 'ue4ss-lua' },
-      { source: 'Outer/MyMod/Scripts/util.lua', destination: '/games/Hello/Mods/MyMod/Scripts/util.lua', modType: 'ue4ss-lua' },
-      { source: 'Outer/MyMod/extras.txt',       destination: '/games/Hello/Mods/MyMod/extras.txt',       modType: 'ue4ss-lua' },
+      { source: 'Outer/MyMod/Scripts/main.lua', destination: '/games/Hello/Mods/MyMod/Scripts/main.lua', modType: 'ue4ss-lua', relative: 'MyMod/Scripts/main.lua' },
+      { source: 'Outer/MyMod/Scripts/util.lua', destination: '/games/Hello/Mods/MyMod/Scripts/util.lua', modType: 'ue4ss-lua', relative: 'MyMod/Scripts/util.lua' },
+      { source: 'Outer/MyMod/extras.txt',       destination: '/games/Hello/Mods/MyMod/extras.txt',       modType: 'ue4ss-lua', relative: 'MyMod/extras.txt' },
     ]);
   });
 });
@@ -135,7 +135,7 @@ describe('buildInstallPlan — unless predicate', () => {
     const archive = ['Mod/Cool.pak'];
     const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
     expect(plan).toEqual([
-      { source: 'Mod/Cool.pak', destination: '/mods/Cool.pak', modType: 'pak' },
+      { source: 'Mod/Cool.pak', destination: '/mods/Cool.pak', modType: 'pak', relative: 'Cool.pak' },
     ]);
   });
 
@@ -186,11 +186,13 @@ describe('buildInstallPlan — shallowest anchor selection', () => {
       source: 'Pack/dwmapi.dll',
       destination: '/binaries/dwmapi.dll',
       modType: 'injector',
+      relative: 'dwmapi.dll',
     });
     expect(plan).toContainEqual({
       source: 'Pack/backup/old/dwmapi.dll',
       destination: '/binaries/backup/old/dwmapi.dll',
       modType: 'injector',
+      relative: 'backup/old/dwmapi.dll',
     });
   });
 });
@@ -219,8 +221,8 @@ describe('buildInstallPlan — install-root scoping for file anchors', () => {
     ];
     const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
     expect(plan).toEqual([
-      { source: 'Pack/inject/dwmapi.dll',    destination: '/binaries/dwmapi.dll',    modType: 'injector' },
-      { source: 'Pack/inject/ue4ss/x.lua',  destination: '/binaries/ue4ss/x.lua',  modType: 'injector' },
+      { source: 'Pack/inject/dwmapi.dll',    destination: '/binaries/dwmapi.dll',    modType: 'injector', relative: 'dwmapi.dll' },
+      { source: 'Pack/inject/ue4ss/x.lua',  destination: '/binaries/ue4ss/x.lua',  modType: 'injector', relative: 'ue4ss/x.lua' },
     ]);
   });
 
@@ -244,9 +246,9 @@ describe('buildInstallPlan — install-root scoping for file anchors', () => {
     ];
     const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
     expect(plan).toEqual([
-      { source: 'dwmapi.dll',  destination: '/binaries/dwmapi.dll',  modType: 'injector' },
-      { source: 'ue4ss/x.lua', destination: '/binaries/ue4ss/x.lua', modType: 'injector' },
-      { source: 'Readme.md',   destination: '/binaries/Readme.md',   modType: 'injector' },
+      { source: 'dwmapi.dll',  destination: '/binaries/dwmapi.dll',  modType: 'injector', relative: 'dwmapi.dll' },
+      { source: 'ue4ss/x.lua', destination: '/binaries/ue4ss/x.lua', modType: 'injector', relative: 'ue4ss/x.lua' },
+      { source: 'Readme.md',   destination: '/binaries/Readme.md',   modType: 'injector', relative: 'Readme.md' },
     ]);
   });
 });
@@ -271,9 +273,9 @@ describe('buildInstallPlan — archive-root take', () => {
     ];
     const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
     expect(plan).toEqual([
-      { source: 'Subnautica2/Content/Paks/foo.pak', destination: '/games/Hello/Subnautica2/Content/Paks/foo.pak', modType: 'root' },
-      { source: 'Engine/Content/bar.uasset',         destination: '/games/Hello/Engine/Content/bar.uasset',         modType: 'root' },
-      { source: 'Readme.md',                          destination: '/games/Hello/Readme.md',                          modType: 'root' },
+      { source: 'Subnautica2/Content/Paks/foo.pak', destination: '/games/Hello/Subnautica2/Content/Paks/foo.pak', modType: 'root', relative: 'Subnautica2/Content/Paks/foo.pak' },
+      { source: 'Engine/Content/bar.uasset',         destination: '/games/Hello/Engine/Content/bar.uasset',         modType: 'root', relative: 'Engine/Content/bar.uasset' },
+      { source: 'Readme.md',                          destination: '/games/Hello/Readme.md',                          modType: 'root', relative: 'Readme.md' },
     ]);
   });
 
@@ -292,7 +294,7 @@ describe('buildInstallPlan — archive-root take', () => {
     const archive = ['a/b/c/d.txt'];
     const plan = buildInstallPlan(rule, archive, { archivePaths: archive, vars: {} });
     expect(plan).toEqual([
-      { source: 'a/b/c/d.txt', destination: '/dest/a/b/c/d.txt', modType: 'root' },
+      { source: 'a/b/c/d.txt', destination: '/dest/a/b/c/d.txt', modType: 'root', relative: 'a/b/c/d.txt' },
     ]);
   });
 });

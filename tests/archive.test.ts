@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readZipEntries } from '../src/corpus/archive.js';
@@ -25,7 +25,9 @@ describe('localCachePaths', () => {
     writeFileSync(join(dir, 'tests', 'cache', 'b.zip'), Buffer.from([]));
     writeFileSync(join(dir, 'tests', 'cache', 'c.txt'), Buffer.from([])); // ignored
     const paths = localCachePaths(dir);
-    expect(paths.map(p => p.split('/').pop())).toEqual(['a.zip', 'b.zip']);
+    // localCachePaths returns native paths (they feed filesystem reads); use
+    // basename rather than splitting on '/' so this passes on Windows too.
+    expect(paths.map(p => basename(p))).toEqual(['a.zip', 'b.zip']);
   });
 
   it('returns empty list if cache dir does not exist', async () => {

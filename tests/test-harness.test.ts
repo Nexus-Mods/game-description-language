@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { assertPlan, type ExpectShape } from '../src/runtime/test-harness.js';
 import type { InstallInstruction } from '../src/runtime/installer-engine.js';
 
-const inst = (source: string, destination: string, modType: string): InstallInstruction => ({ source, destination, modType });
+// `relative` (path under placeAt) is part of the InstallInstruction contract and
+// is read by assertPlan's absolute-path guard; default it to the destination's
+// basename so fixtures stay terse.
+const inst = (
+  source: string,
+  destination: string,
+  modType: string,
+  relative: string = destination.split('/').pop() ?? destination,
+): InstallInstruction => ({ source, destination, modType, relative });
 
 describe('assertPlan', () => {
   it('returns OK when plan matches expectation by destinations', () => {

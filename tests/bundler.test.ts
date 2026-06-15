@@ -15,9 +15,10 @@ describe('runBundler', () => {
       `export default function main(): void { log('info', 'test', {}); }\n`,
     );
     await runBundler(dir);
-    expect(existsSync(join(dir, 'dist', 'extension.js'))).toBe(true);
-    expect(existsSync(join(dir, 'dist', 'extension.js.map'))).toBe(true);
-    const bundle = readFileSync(join(dir, 'dist', 'extension.js'), 'utf8');
+    // Bundle output is index.js (the Vortex extension entry-point convention).
+    expect(existsSync(join(dir, 'dist', 'index.js'))).toBe(true);
+    expect(existsSync(join(dir, 'dist', 'index.js.map'))).toBe(true);
+    const bundle = readFileSync(join(dir, 'dist', 'index.js'), 'utf8');
     expect(bundle).toContain('vortex-api');   // externalised reference present
   }, 30000);
 });
@@ -32,6 +33,6 @@ describe('runBundler — extension-repo cwd (no local node_modules)', () => {
     );
     // Note: no node_modules in `dir`. The bundler must find ts-loader in the GDL repo's node_modules.
     await runBundler(dir);
-    expect(existsSync(join(dir, 'dist', 'extension.js'))).toBe(true);
+    expect(existsSync(join(dir, 'dist', 'index.js'))).toBe(true);
   }, 30000);
 });
