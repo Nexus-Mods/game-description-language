@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GdlRuntime } from '../src/runtime/vortex-shim.js';
+import type { ContextSpec } from '../src/runtime/context-resolver.js';
 import type { IExtensionContext } from 'vortex-api';
 
 const makeCtx = () => ({
@@ -157,5 +158,61 @@ describe('GdlRuntime — lazy modType getPath', () => {
 
     const getPath = registerModType.mock.calls[0]![3];
     expect(getPath({})).toBe('/fallback/Mods/Paks');
+  });
+});
+
+describe('GdlRuntime — derives game.details store ids from stores', () => {
+  const baseDecl = {
+    id: 'subnautica2',
+    name: 'Subnautica 2',
+    executable: 'Subnautica2.exe',
+    requiredFiles: ['Subnautica2.exe'],
+  };
+  const emptyCtxSpec = { bindings: [] } as unknown as ContextSpec;
+  const registeredGame = (ctx: IExtensionContext) =>
+    (ctx.registerGame as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+
+  it('projects each store id into details under <storeId>AppId, coercing numeric ids', () => {
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      baseDecl,
+      [
+        { id: 'steam', value: '1962700' },
+        { id: 'epic', value: '22bfc34d90b64054809542014fc9eb32' },
+        { id: 'xbox', value: 'UnknownWorldsEntertainmen.Subnautica2' },
+      ],
+      emptyCtxSpec,
+      [],
+    );
+    const { details } = registeredGame(ctx);
+    expect(details).toMatchObject({
+      steamAppId: 1962700,
+      epicAppId: '22bfc34d90b64054809542014fc9eb32',
+      xboxAppId: 'UnknownWorldsEntertainmen.Subnautica2',
+    });
+    expect(typeof details.steamAppId).toBe('number');
+    expect(typeof details.epicAppId).toBe('string');
+  });
+
+  it('lets an explicit game.details entry override the derived value', () => {
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { ...baseDecl, details: { steamAppId: 999 } },
+      [{ id: 'steam', value: '1962700' }],
+      emptyCtxSpec,
+      [],
+    );
+    expect(registeredGame(ctx).details.steamAppId).toBe(999);
+  });
+
+  it('skips the manual store (not a real store id)', () => {
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      baseDecl,
+      [{ id: 'manual', value: 'sideloaded' }],
+      emptyCtxSpec,
+      [],
+    );
+    expect(registeredGame(ctx).details).not.toHaveProperty('manualAppId');
   });
 });

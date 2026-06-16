@@ -15,6 +15,26 @@ import { buildInstallPlan, ruleSupports } from './installer-engine.js';
 
 const normaliseArchivePath = (path: string): string => path.replace(/\\/g, '/');
 
+// `stores:` is the single source of truth for store ids. Project each one into
+// `game.details` under a conventional `<storeId>AppId` key so authors don't repeat
+// it under `game.details`. Only `steamAppId` is read by Vortex today (Steam launch
+// in util/Steam.ts + the gameinfo-steam panel); the rest are inert metadata kept in
+// case they're needed. Numeric ids (steam, gog) become numbers — matching the
+// `steamAppId: number` convention Vortex expects — while GUID/identity-name ids
+// (epic, xbox) stay strings. `manual` is not a real store id, so it gets no key.
+// Explicit `game.details` entries still override these (see registerGame).
+const STORES_WITHOUT_DETAIL_KEY = new Set(['manual']);
+
+function deriveStoreDetails(stores: StoreDecl[]): Record<string, string | number> {
+  const details: Record<string, string | number> = {};
+  for (const { id, value } of stores) {
+    if (STORES_WITHOUT_DETAIL_KEY.has(id)) continue;
+    const str = String(value);
+    details[`${id}AppId`] = /^\d+$/.test(str) ? Number(str) : str;
+  }
+  return details;
+}
+
 export interface GameDecl {
   id: string;
   name: string;
@@ -120,6 +140,7 @@ export class GdlRuntime {
       ...(decl.logo          !== undefined && { logo:        decl.logo }),
       details: {
         ...(decl.nexusDomain !== undefined && { nexusPageId: decl.nexusDomain }),
+        ...deriveStoreDetails(stores),
         ...decl.details,
       },
       queryPath: async () => {
