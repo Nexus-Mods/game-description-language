@@ -21,6 +21,15 @@ export interface DocumentNode extends Node {
   toolbarActions?: ToolbarActionNode[];
   setup?: SetupNode;
   events?: EventsNode;
+  diagnostics?: DiagnosticNode[];
+}
+
+// A runtime diagnostic (in-game health check). `hook` names an exported
+// IModHealthCheck object in src/hooks.ts which the runtime registers via
+// context.registerHealthCheck.
+export interface DiagnosticNode extends Node {
+  kind: 'diagnostic';
+  hook: string;
 }
 
 export interface GameNode extends Node {
@@ -77,11 +86,21 @@ export interface InstallerNode extends Node {
   when: PredicateNode;
   unless?: PredicateNode;
   scope?: InstallerScope;
-  // Single-anchor form OR route form. Exactly one is set.
+  // Exactly one form is set: single-anchor, route, copy, or a custom install
+  // hook (installHook holds the exported hook name from src/hooks.ts).
   single?: SingleInstallerForm;
   route?: RouteEntry[];
-  // modType only required for single form; route entries carry their own modType.
+  copy?: CopyInstallerForm;
+  installHook?: string;
+  // modType required for single and copy forms; route entries carry their own.
+  // The hook form emits its own instructions, so modType is optional there.
   modType?: string;
+}
+
+export interface CopyInstallerForm {
+  // When true, a single shared top-level wrapper dir is stripped from
+  // destinations (matches Vortex's IInstallerSpec stripCommonRoot).
+  stripCommonRoot: boolean;
 }
 
 export interface InstallerScope {
@@ -110,13 +129,14 @@ export type PatternNode =
 
 // Predicates
 export type PredicateNode =
-  | { kind: 'hasFile';  pattern: PatternNode;        span: YamlSpan }
-  | { kind: 'hasFiles'; patterns: PatternNode[];     span: YamlSpan }
-  | { kind: 'matches';  pattern: PatternNode;        span: YamlSpan }
-  | { kind: 'when';     expr: ComparisonExpr;        span: YamlSpan }
-  | { kind: 'any';      arms: PredicateNode[];       span: YamlSpan }
-  | { kind: 'all';      arms: PredicateNode[];       span: YamlSpan }
-  | { kind: 'not';      arm: PredicateNode;          span: YamlSpan };
+  | { kind: 'hasFile';    pattern: PatternNode;                  span: YamlSpan }
+  | { kind: 'hasFiles';   patterns: PatternNode[];               span: YamlSpan }
+  | { kind: 'matches';    pattern: PatternNode;                  span: YamlSpan }
+  | { kind: 'extensions'; list: string[]; mode: 'any' | 'all';   span: YamlSpan }
+  | { kind: 'when';       expr: ComparisonExpr;                  span: YamlSpan }
+  | { kind: 'any';        arms: PredicateNode[];                 span: YamlSpan }
+  | { kind: 'all';        arms: PredicateNode[];                 span: YamlSpan }
+  | { kind: 'not';        arm: PredicateNode;                    span: YamlSpan };
 
 // Boolean comparison expression used by `!when`. Intentionally tiny.
 export type ComparisonExpr =
@@ -161,6 +181,11 @@ export interface TestsNode extends Node {
   // (e.g. Xbox passes the Content/ parent as installPath). Map of storeId to
   // override fields. Missing entries default to `/games/<game.id>`.
   scenarios?: Record<string, { installPath?: string }>;
+  // Maps a filename (matched by basename) to a template string the corpus
+  // serves when an install hook reads that file. `${manifestId}`/`${modId}`/
+  // `${fileId}` are interpolated per fixture. Lets hook installers (which read
+  // file contents) run against real mod manifests, which carry only file lists.
+  syntheticContent?: Record<string, string>;
 }
 
 export interface TestCaseNode extends Node {

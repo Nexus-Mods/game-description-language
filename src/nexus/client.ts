@@ -86,31 +86,51 @@ export const fetchArchiveManifest = async (
   return fetchJson<PreviewDirectory>(url);
 };
 
-const PUBLISHED_MODS_QUERY = `query($domain: String!) {
-  mods(filter: {
-    gameDomainName: { value: $domain, op: EQUALS }
-    status: { value: "published", op: EQUALS }
-  }) { nodes { modId } }
+const PUBLISHED_MODS_QUERY = `query($domain: String!, $count: Int!, $offset: Int!) {
+  mods(
+    filter: {
+      gameDomainName: { value: $domain, op: EQUALS }
+      status: { value: "published", op: EQUALS }
+    }
+    count: $count
+    offset: $offset
+  ) { totalCount nodes { modId } }
 }`;
+
+/** Page size for the paginated published-mods query. */
+const MODS_PAGE_SIZE = 50;
 
 export const fetchPublishedModIds = async (gameDomain: string): Promise<number[]> => {
   const apiKey = process.env.NEXUS_API_KEY;
   if (!apiKey) throw new Error('NEXUS_API_KEY is required to list mods');
-  const result = await fetchJson<{
-    data?: { mods: { nodes: { modId: number }[] } };
-    errors?: { message: string }[];
-  }>(NEXUS_GRAPHQL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: apiKey },
-    body: JSON.stringify({
-      query: PUBLISHED_MODS_QUERY,
-      variables: { domain: gameDomain },
-    }),
-  });
-  if (result.errors?.length) {
-    throw new Error(`GraphQL mods query error: ${result.errors.map(e => e.message).join('; ')}`);
+
+  // The Nexus GraphQL `mods` connection is paginated (offset/count). Without a
+  // loop we'd only ever see the first page, so walk pages until we've collected
+  // `totalCount` mods (or a page comes back empty as a safety stop).
+  const modIds: number[] = [];
+  let offset = 0;
+  for (;;) {
+    const result = await fetchJson<{
+      data?: { mods: { totalCount: number; nodes: { modId: number }[] } };
+      errors?: { message: string }[];
+    }>(NEXUS_GRAPHQL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: apiKey },
+      body: JSON.stringify({
+        query: PUBLISHED_MODS_QUERY,
+        variables: { domain: gameDomain, count: MODS_PAGE_SIZE, offset },
+      }),
+    });
+    if (result.errors?.length) {
+      throw new Error(`GraphQL mods query error: ${result.errors.map(e => e.message).join('; ')}`);
+    }
+    const page = result.data?.mods.nodes ?? [];
+    for (const n of page) modIds.push(n.modId);
+    const total = result.data?.mods.totalCount ?? 0;
+    offset += page.length;
+    if (page.length === 0 || offset >= total) break;
   }
-  return result.data?.mods.nodes.map(n => n.modId) ?? [];
+  return modIds;
 };
 
 export const flattenManifest = (dir: PreviewDirectory): string[] => {

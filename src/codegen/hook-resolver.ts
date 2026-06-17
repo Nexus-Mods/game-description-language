@@ -4,8 +4,15 @@ import { join } from 'node:path';
 import type { BuildError } from '../errors.js';
 import { findHook } from '../schema/hook-catalog.js';
 
-export const resolveHooks = async (cwd: string, referencedHookIds: string[]): Promise<BuildError[]> => {
-  if (referencedHookIds.length === 0) return [];
+export const resolveHooks = async (
+  cwd: string,
+  referencedHookIds: string[],
+  // Hook names that are user-chosen (e.g. custom installer hooks) rather than
+  // fixed catalog entries. These are checked for existence + export only, not
+  // catalog membership.
+  exportOnlyHookIds: string[] = [],
+): Promise<BuildError[]> => {
+  if (referencedHookIds.length === 0 && exportOnlyHookIds.length === 0) return [];
 
   const hooksPath = join(cwd, 'src', 'hooks.ts');
   const span = { file: hooksPath, line: 1, column: 1, offset: 0, length: 0 };
@@ -13,7 +20,7 @@ export const resolveHooks = async (cwd: string, referencedHookIds: string[]): Pr
   if (!existsSync(hooksPath)) {
     return [{
       code: 'GDL071',
-      message: `\`src/hooks.ts\` is required because the YAML references hook(s): ${referencedHookIds.join(', ')}`,
+      message: `\`src/hooks.ts\` is required because the YAML references hook(s): ${[...referencedHookIds, ...exportOnlyHookIds].join(', ')}`,
       span,
     }];
   }
@@ -71,6 +78,16 @@ export const resolveHooks = async (cwd: string, referencedHookIds: string[]): Pr
         message: `\`src/hooks.ts\` does not export \`${id}\``,
         span,
         hint: `expected signature: ${entry.expectedSignature}`,
+      });
+    }
+  }
+  for (const id of exportOnlyHookIds) {
+    if (!exportedNames.has(id)) {
+      errors.push({
+        code: 'GDL070',
+        message: `\`src/hooks.ts\` does not export \`${id}\``,
+        span,
+        hint: 'custom installer hook: expected an exported InstallFn-shaped function',
       });
     }
   }

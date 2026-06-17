@@ -1,12 +1,12 @@
 import { parseDocument, type Document, type Node as YamlNode, isMap, isSeq, isScalar, isPair } from 'yaml';
 import type {
   DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode,
-  InstallerNode, InstallerScope, SingleInstallerForm, RouteEntry, TakeStrategy,
+  InstallerNode, InstallerScope, SingleInstallerForm, RouteEntry, CopyInstallerForm, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
   FileVersionNode, VersionSourceNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode,
   ValidatorNode, ValidatorAssertNode, PlacementAssertNode,
-  NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode,
+  NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode, DiagnosticNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -267,7 +267,7 @@ const parsePredicate = (node: YamlNode | null | undefined, file: string, source:
       }
     }
 
-    const PRED_KEYS = ['hasFile', 'hasFiles', 'matches', 'any', 'all', 'not'];
+    const PRED_KEYS = ['hasFile', 'hasFiles', 'matches', 'extensions', 'any', 'all', 'not'];
     const matched = keys.filter(k => PRED_KEYS.includes(k));
     if (matched.length > 1) {
       throw new BuildErrors([{
@@ -289,6 +289,18 @@ const parsePredicate = (node: YamlNode | null | undefined, file: string, source:
       if (key === 'matches') {
         return { kind: 'matches', pattern: parsePattern(value as YamlNode, file, source), span };
       }
+      if (key === 'extensions' && isMap(value)) {
+        const listYaml = value.get('list', true);
+        const list: string[] = [];
+        if (isSeq(listYaml)) {
+          for (const item of listYaml.items) {
+            if (isScalar(item) && typeof item.value === 'string') list.push(item.value);
+          }
+        }
+        const modeYaml = value.get('mode', true);
+        const mode = (isScalar(modeYaml) && modeYaml.value === 'all') ? 'all' : 'any';
+        return { kind: 'extensions', list, mode, span };
+      }
       if (key === 'any' && isSeq(value)) {
         const arms = value.items.map(i => parsePredicate(i as YamlNode, file, source));
         return { kind: 'any', arms, span };
@@ -305,7 +317,7 @@ const parsePredicate = (node: YamlNode | null | undefined, file: string, source:
 
   throw new BuildErrors([{
     code: 'GDL042',
-    message: 'expected a predicate object with one of: hasFile, hasFiles, matches, any, all, not',
+    message: 'expected a predicate object with one of: hasFile, hasFiles, matches, extensions, any, all, not',
     span,
   }]);
 };
@@ -406,11 +418,40 @@ const parseTestsBlock = (node: YamlNode, file: string, source: string): TestsNod
     }
   }
 
+  // Optional synthetic content: filename -> template string served to install
+  // hooks that read file contents during corpus runs.
+  let syntheticContent: Record<string, string> | undefined;
+  const syntheticYaml = node.get('syntheticContent', true);
+  if (syntheticYaml !== undefined && syntheticYaml !== null) {
+    if (!isMap(syntheticYaml)) {
+      throw new BuildErrors([{
+        code: 'GDL085',
+        message: '`tests.syntheticContent` must be a mapping of filename → template string',
+        span: spanOf(file, source, syntheticYaml as YamlNode),
+      }]);
+    }
+    syntheticContent = {};
+    for (const pair of syntheticYaml.items) {
+      if (!isPair(pair)) continue;
+      const filename = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+      const value = pair.value;
+      if (!isScalar(value) || typeof value.value !== 'string') {
+        throw new BuildErrors([{
+          code: 'GDL086',
+          message: `\`tests.syntheticContent.${filename}\` must be a string template`,
+          span: spanOf(file, source, value as YamlNode),
+        }]);
+      }
+      syntheticContent[filename] = value.value;
+    }
+  }
+
   return {
     kind: 'tests',
     corpus,
     cases,
     ...(scenarios !== undefined && { scenarios }),
+    ...(syntheticContent !== undefined && { syntheticContent }),
     span: spanOf(file, source, node),
   };
 };
@@ -711,10 +752,28 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
       }
 
       const routeYaml = entry.get('route', true);
+      const copyYaml = entry.get('copy', true);
+      const installYaml = entry.get('install', true);
       let single: SingleInstallerForm | undefined;
       let route: RouteEntry[] | undefined;
+      let copy: CopyInstallerForm | undefined;
+      let installHook: string | undefined;
       let modType: string | undefined;
-      if (isSeq(routeYaml)) {
+      if (isMap(installYaml)) {
+        const hookYaml = installYaml.get('hook', true);
+        if (isScalar(hookYaml) && typeof hookYaml.value === 'string') {
+          installHook = hookYaml.value;
+        } else {
+          throw new BuildErrors([{
+            code: 'GDL052',
+            message: 'installer `install:` must be a mapping with a string `hook:` key',
+            span: spanOf(file, source, installYaml as YamlNode),
+          }]);
+        }
+        // A hook installer may still declare a modType tag.
+        const mt = entry.get('modType');
+        if (mt !== undefined && mt !== null) modType = String(mt);
+      } else if (isSeq(routeYaml)) {
         route = routeYaml.items.map(rEntry => {
           if (!isMap(rEntry)) {
             throw new BuildErrors([{
@@ -732,6 +791,11 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
             span:    spanOf(file, source, rEntry),
           };
         });
+      } else if (isMap(copyYaml)) {
+        const stripYaml = copyYaml.get('stripCommonRoot', true);
+        const stripCommonRoot = isScalar(stripYaml) ? Boolean(stripYaml.value) : false;
+        copy = { stripCommonRoot };
+        modType = String(entry.get('modType') ?? '');
       } else {
         single = {
           anchor:  parsePattern(entry.get('anchor', true) as YamlNode, file, source),
@@ -750,6 +814,8 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
         ...(scope  !== undefined && { scope }),
         ...(single !== undefined && { single }),
         ...(route  !== undefined && { route }),
+        ...(copy   !== undefined && { copy }),
+        ...(installHook !== undefined && { installHook }),
         ...(modType !== undefined && { modType }),
         span: spanOf(file, source, entry),
       });
@@ -840,6 +906,34 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     };
   }
 
+  const diagnosticsYaml = root.get('diagnostics', true);
+  let diagnostics: DiagnosticNode[] | undefined;
+  if (isSeq(diagnosticsYaml)) {
+    diagnostics = [];
+    for (const entry of diagnosticsYaml.items) {
+      if (!isMap(entry)) {
+        throw new BuildErrors([{
+          code: 'GDL190',
+          message: 'diagnostics entries must be mappings with a `hook:` key',
+          span: spanOf(file, source, entry as YamlNode),
+        }]);
+      }
+      const hookYaml = entry.get('hook', true);
+      if (!isScalar(hookYaml) || typeof hookYaml.value !== 'string') {
+        throw new BuildErrors([{
+          code: 'GDL191',
+          message: 'diagnostics entry `hook:` must be a string naming an exported IModHealthCheck in src/hooks.ts',
+          span: spanOf(file, source, entry),
+        }]);
+      }
+      diagnostics.push({
+        kind: 'diagnostic',
+        hook: hookYaml.value,
+        span: spanOf(file, source, entry),
+      });
+    }
+  }
+
   const eventsYaml = root.get('events', true);
   let events: EventsNode | undefined;
   if (isMap(eventsYaml)) {
@@ -871,6 +965,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(toolbarActions  !== undefined && { toolbarActions }),
     ...(setup           !== undefined && { setup }),
     ...(events          !== undefined && { events }),
+    ...(diagnostics     !== undefined && { diagnostics }),
     span: spanOf(file, source, root),
   };
 };

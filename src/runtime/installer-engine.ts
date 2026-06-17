@@ -1,4 +1,5 @@
 import { compileGlob, findShallowest } from './glob.js';
+import { compileRegex } from './pattern-matcher.js';
 import { interpolate } from './interpolate.js';
 import { evalPredicateExpr, type PredicateExpr, type EvalContext } from './predicate.js';
 
@@ -23,6 +24,28 @@ export interface RouteEntry {
   modType: string;
 }
 
+// Whole-archive copy form, mirroring Vortex's `buildCopyInstructions`: copy
+// every data file, optionally stripping a single shared top-level wrapper dir,
+// with destinations relative to the mod's deploy root (queryModPath).
+export interface CopyForm {
+  stripCommonRoot: boolean;
+}
+
+/**
+ * A custom install hook for installers whose logic can't be expressed
+ * declaratively (e.g. parsing a manifest file and emitting attribute
+ * instructions). It mirrors Vortex's InstallFn: the archive is already fully
+ * extracted under `destinationPath`, so the hook may read files from disk. It
+ * returns raw Vortex instructions (typed `unknown[]` here to keep the engine
+ * free of a vortex-api dependency; the runtime shim passes them straight to
+ * Vortex). `when`/`unless` still gate support via `ruleSupports`.
+ */
+export type InstallHookFn = (
+  files: string[],
+  destinationPath: string,
+  gameId: string,
+) => Promise<{ instructions: unknown[] }>;
+
 export interface InstallerRule {
   id: string;
   priority: number;
@@ -31,7 +54,14 @@ export interface InstallerRule {
   scope?: { stores?: string[] };
   single?: SingleForm;
   route?: RouteEntry[];
-  modType?: string;          // single only
+  copy?: CopyForm;
+  installHook?: InstallHookFn;
+  // Name of the custom install hook (from game.yaml `install: { hook }`). Set on
+  // the runtime rule so tooling that can't execute the hook (e.g. the corpus
+  // runner's static lowering) can still recognise the installer and match it on
+  // its `when` predicate.
+  hookName?: string;
+  modType?: string;          // single and copy
 }
 
 export interface InstallInstruction {
@@ -120,9 +150,26 @@ const stripPath = (
   return joinSegments(pathSegs.slice(dropCount));
 };
 
+/**
+ * The single top-level directory shared by every entry, or undefined if files
+ * live at the root or under different top-level dirs. Paths are already
+ * normalised to `/` separators. Mirrors Vortex's `findCommonRootDir`.
+ */
+const findCommonRootDir = (files: readonly string[]): string | undefined => {
+  if (files.length === 0) return undefined;
+  const firstSeg = (p: string): string => p.split('/')[0]!;
+  const root = firstSeg(files[0]!);
+  // A bare filename has no separator -> no wrapping dir to strip.
+  if (!root || root === files[0]) return undefined;
+  for (const f of files) {
+    if (firstSeg(f) !== root) return undefined;
+  }
+  return root;
+};
+
 const matches = (p: Pattern, path: string): boolean => {
   if (p.kind === 'glob') return compileGlob(p.pattern)(path);
-  return new RegExp(p.pattern).test(path);
+  return compileRegex(p.pattern).test(path);
 };
 
 /**
@@ -146,6 +193,19 @@ export const buildInstallPlan = (
   ctx: EvalContext,
 ): InstallInstruction[] => {
   if (!ruleSupports(rule, ctx)) return [];
+
+  if (rule.copy) {
+    // Whole-archive copy: every data file, destinations relative to the mod
+    // deploy root. When stripCommonRoot is set and the archive wraps everything
+    // in one top-level dir, that dir is dropped (same contract as Vortex's
+    // buildCopyInstructions).
+    const dataFiles = archivePaths.filter(p => !p.endsWith('/'));
+    const commonRoot = rule.copy.stripCommonRoot ? findCommonRootDir(dataFiles) : undefined;
+    return dataFiles.map(src => {
+      const relative = commonRoot ? src.substring(commonRoot.length + 1) : src;
+      return { source: src, destination: relative, relative, modType: rule.modType! };
+    });
+  }
 
   if (rule.single) {
     const matcher = compileGlob(rule.single.anchor.pattern);

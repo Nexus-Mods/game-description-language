@@ -49,6 +49,39 @@ describe('runCorpus', () => {
     expect(epic.entries[0]?.matchedInstaller).toBe('pak');
   });
 
+  it('matches a custom-hook installer on its predicate, ahead of a lower-priority declarative rule', () => {
+    // A hook installer can't be planned statically; it should still be picked
+    // (and reported viaHook) when its `when` matches, before the declarative rule.
+    const hookRule: InstallerRule = {
+      id: 'content-xml',
+      priority: 5,
+      when: { kind: 'hasFile', glob: '**/*.pak' },
+      hookName: 'installContentXml',
+    };
+    const archive = join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.zip');
+    const report = runCorpus([pakRule, hookRule], [archive], { vars: {} });
+    expect(report.matched).toBe(1);
+    expect(report.entries[0]).toMatchObject({
+      matchedInstaller: 'content-xml',
+      viaHook: true,
+      planSize: 0,
+    });
+  });
+
+  it('falls through past a hook installer whose predicate does not match', () => {
+    const hookRule: InstallerRule = {
+      id: 'content-xml',
+      priority: 5,
+      when: { kind: 'hasFile', glob: '**/content.xml' },
+      hookName: 'installContentXml',
+    };
+    const archive = join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak.zip');
+    const report = runCorpus([hookRule, pakRule], [archive], { vars: {} });
+    expect(report.matched).toBe(1);
+    expect(report.entries[0]?.matchedInstaller).toBe('pak');
+    expect(report.entries[0]?.viaHook).toBeUndefined();
+  });
+
   it('reports unmatched archives without failing the run', () => {
     const onlyLua: InstallerRule = {
       ...pakRule,

@@ -1,4 +1,4 @@
-import type { IExtensionContext, IGame, TestSupportedFn, InstallFn, ActionVisibilityFn, ActionRunFn } from 'vortex-api';
+import type { IExtensionContext, IGame, TestSupportedFn, InstallFn, ActionVisibilityFn, ActionRunFn, IModHealthCheck } from 'vortex-api';
 import type { DiscoveryFacts, ResolvedContext, ResolvableValue } from './context-resolver.js';
 import { resolveContext, type ContextSpec } from './context-resolver.js';
 
@@ -131,13 +131,22 @@ export class GdlRuntime {
     toolbarActions: ToolbarActionDecl[] = [],
     setupDirs: string[] = [],
     eventHooks: EventHooks = {},
+    diagnostics: IModHealthCheck[] = [],
   ) {
+    // Mirror Vortex's environment.SteamAPPId auto-derivation: queryArgs.steam
+    // would set it so the launched game sees the right app id. GDL discovers via
+    // GameStoreHelper, so derive it from the declared steam store. The matching
+    // details.steamAppId (and other store ids) come from deriveStoreDetails below.
+    const steamId = stores.find(s => s.id === 'steam')?.value;
+    const steamAppId = steamId !== undefined ? String(steamId) : undefined;
+
     const game: IGame = {
       id: decl.id,
       name: decl.name,
       executable: () => decl.executable,
       requiredFiles: decl.requiredFiles,
       ...(decl.logo          !== undefined && { logo:        decl.logo }),
+      ...(steamAppId !== undefined && { environment: { SteamAPPId: steamAppId } }),
       details: {
         ...(decl.nexusDomain !== undefined && { nexusPageId: decl.nexusDomain }),
         ...deriveStoreDetails(stores),
@@ -249,6 +258,12 @@ export class GdlRuntime {
         });
       });
     }
+
+    // Register runtime diagnostics as in-game health checks. Each entry is a
+    // user-defined IModHealthCheck from src/hooks.ts, passed straight through.
+    for (const check of diagnostics) {
+      this.api.registerHealthCheck(check);
+    }
   }
 
   private registerInstallerRule(gameId: string, rule: InstallerRule): void {
@@ -270,13 +285,23 @@ export class GdlRuntime {
       return { supported: ruleSupports(rule, ctx) };
     };
 
-    const install: InstallFn = async (files, _destinationPath, gid) => {
+    const install: InstallFn = async (files, destinationPath, gid) => {
+      if (gid !== gameId) return { instructions: [] };
+
+      // Custom installer hook: the archive is already extracted under
+      // destinationPath, so the hook reads files itself and returns raw Vortex
+      // instructions (including attribute instructions the declarative engine
+      // can't express). Pass the raw Vortex paths through unchanged.
+      if (rule.installHook) {
+        const result = await rule.installHook(files, destinationPath, gid);
+        return { instructions: result.instructions as Awaited<ReturnType<InstallFn>>['instructions'] };
+      }
+
       const normalisedFiles = files.map(normaliseArchivePath);
       const ctx = {
         archivePaths: normalisedFiles,
         vars: this.resolvedCtx ?? {},
       };
-      if (gid !== gameId) return { instructions: [] };
       const rawByNormalised = new Map(files.map(file => [normaliseArchivePath(file), file]));
       const plan = buildInstallPlan(rule, normalisedFiles, ctx);
       const instructions = plan.flatMap(p => {

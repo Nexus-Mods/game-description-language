@@ -83,6 +83,10 @@ declare module 'vortex-api' {
       action: ActionRunFn,
       condition?: ActionVisibilityFn,
     ) => void;
+    // Registers an in-game health check (diagnostic) that runs against installed
+    // mods. The concrete IModHealthCheck shape lives in the real vortex-api; GDL
+    // passes user-defined check objects straight through.
+    registerHealthCheck: (check: IModHealthCheck) => void;
     // Vortex only populates `api.events` etc. after extension init is done; do
     // event-listener wiring inside the `once` callback so it runs at that point.
     once: (callback: () => void | PromiseLike<void>) => void;
@@ -92,6 +96,14 @@ declare module 'vortex-api' {
         on: (event: string, handler: (...args: unknown[]) => void) => void;
       };
     };
+  }
+
+  // Minimal stand-in for the real vortex-api IModHealthCheck. The full type
+  // (category/severity/triggers enums + checkMod) lives in vortex-api and is
+  // used by extension src/hooks.ts; GDL only needs an opaque object with an id.
+  export interface IModHealthCheck {
+    id: string;
+    [key: string]: unknown;
   }
 
   export interface IFoundGame {

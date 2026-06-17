@@ -55,13 +55,15 @@ program
   .option('--mods <ids>', 'comma-separated mod IDs to fetch (e.g. --mods 100,101,102)', (v) =>
     v.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n))
   )
-  .action(async (opts: { yaml?: string; fetch?: boolean; mods?: number[] }) => {
+  .option('--limit <n>', 'cap how many mods --fetch pulls from the catalog', (v) => parseInt(v, 10))
+  .action(async (opts: { yaml?: string; fetch?: boolean; mods?: number[]; limit?: number }) => {
     try {
       await runTestCorpus({
         cwd: process.cwd(),
         ...(opts.yaml  !== undefined && { yamlPath: opts.yaml }),
         ...(opts.fetch !== undefined && { fetch:    opts.fetch }),
         ...(opts.mods  !== undefined && { modIds:   opts.mods }),
+        ...(opts.limit !== undefined && Number.isFinite(opts.limit) && { limit: opts.limit }),
       });
     } catch (err) {
       const { reportBuildError } = await import('./commands/build.js');

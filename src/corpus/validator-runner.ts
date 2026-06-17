@@ -56,7 +56,10 @@ export const runValidators = (
     const files = archiveContents.get(entry.archive);
     if (!files) continue;
 
-    const ctx = { archivePaths: files, vars };
+    const ctx = {
+      archivePaths: files,
+      vars,
+    };
 
     for (const v of validators) {
       if (!evalPredicateExpr(v.when, ctx)) continue;

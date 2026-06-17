@@ -66,7 +66,8 @@ export const evalPredicateExpr = (
   pred: PredicateExpr,
   ctx: EvalContext,
 ): boolean => {
-  if (pred.kind === 'hasFile' || pred.kind === 'hasFiles' || pred.kind === 'matches') {
+  if (pred.kind === 'hasFile' || pred.kind === 'hasFiles' || pred.kind === 'matches'
+      || pred.kind === 'extensions') {
     return evalPredicate(pred, ctx.archivePaths);
   }
   if (pred.kind === 'when') return evalComparison(pred.expr, ctx);

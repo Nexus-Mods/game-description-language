@@ -42,6 +42,10 @@ export const buildConfig = (cwd: string): Configuration => ({
     ],
   },
   externals: {
+    // Vortex injects the API at runtime under both specifiers; extensions
+    // (and their src/hooks.ts) must not bundle it. Mirrors the externals used
+    // by Vortex's own Rolldown extension build.
     'vortex-api': 'commonjs2 vortex-api',
+    '@nexusmods/vortex-api': 'commonjs2 @nexusmods/vortex-api',
   },
 });
