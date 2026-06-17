@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  fetchGames, fetchModFiles, fetchArchiveManifest, flattenManifest,
+  fetchGames, fetchModFiles, fetchArchiveManifest, flattenManifest, fetchPublishedModIds,
   type NexusGameEntry, type NexusModFile, type PreviewDirectory,
 } from '../src/nexus/client.js';
 
@@ -76,6 +76,43 @@ describe('Nexus client', () => {
       'MyMod/CoolPak.pak',
       'MyMod/Readme.md',
     ]);
+  });
+
+  it('fetchPublishedModIds walks every page until totalCount is reached', async () => {
+    // totalCount = 3 with a page size larger than 1, returned across two pages.
+    const pages = [
+      { data: { mods: { totalCount: 3, nodes: [{ modId: 1 }, { modId: 2 }] } } },
+      { data: { mods: { totalCount: 3, nodes: [{ modId: 3 }] } } },
+    ];
+    let call = 0;
+    const fetchMock = vi.fn(async () => mkRes(pages[call++]!));
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.NEXUS_API_KEY = 'k';
+    try {
+      const ids = await fetchPublishedModIds('xrebirth');
+      expect(ids).toEqual([1, 2, 3]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      // Second call advances the offset past the first page.
+      const body2 = JSON.parse(String((fetchMock.mock.calls[1]![1] as RequestInit).body));
+      expect(body2.variables).toMatchObject({ domain: 'xrebirth', offset: 2 });
+    } finally {
+      delete process.env.NEXUS_API_KEY;
+    }
+  });
+
+  it('fetchPublishedModIds stops on a single full page (offset >= totalCount)', async () => {
+    const fetchMock = vi.fn(async () =>
+      mkRes({ data: { mods: { totalCount: 2, nodes: [{ modId: 10 }, { modId: 11 }] } } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.NEXUS_API_KEY = 'k';
+    try {
+      const ids = await fetchPublishedModIds('xrebirth');
+      expect(ids).toEqual([10, 11]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      delete process.env.NEXUS_API_KEY;
+    }
   });
 
   it('throws a useful error on 401 with API-key hint', async () => {

@@ -30,6 +30,7 @@ const pickDefaultFile = (files: NexusModFile[]): NexusModFile | undefined => {
 // When modIds is omitted, auto-discovers all published mods via the Nexus API.
 export interface FetchCorpusInputs extends FetchCorpusOptions {
   modIds?: number[];     // empty/undefined = auto-discover all published mods
+  limit?: number;        // cap the number of mods fetched (after discovery)
 }
 
 export const fetchCorpus = async (opts: FetchCorpusInputs): Promise<void> => {
@@ -39,9 +40,14 @@ export const fetchCorpus = async (opts: FetchCorpusInputs): Promise<void> => {
   const game = games.find(g => g.domain_name === opts.gameDomain);
   if (!game) throw new Error(`Unknown Nexus game domain: ${opts.gameDomain}`);
 
-  const modIds = opts.modIds && opts.modIds.length > 0
+  const discovered = opts.modIds && opts.modIds.length > 0
     ? opts.modIds
     : await fetchPublishedModIds(opts.gameDomain);
+  // Cap the catalog so `--fetch` on a large game doesn't pull thousands of
+  // manifests. `--mods` still scopes explicitly; `--limit` bounds the rest.
+  const modIds = opts.limit !== undefined && opts.limit >= 0
+    ? discovered.slice(0, opts.limit)
+    : discovered;
 
   for (const modId of modIds) {
     try {

@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseYaml } from '../parser/index.js';
 import { validate } from '../schema/validator.js';
 import { BuildErrors } from '../errors.js';
 import { localCachePaths, readArchiveEntries } from '../corpus/archive.js';
 import { runCorpus } from '../corpus/runner.js';
+import { loadExtensionBundle, runExecutionCorpus } from '../corpus/execution-runner.js';
 import { runValidators, type ValidatorDef } from '../corpus/validator-runner.js';
 import { fetchCorpus } from '../nexus/fetch-corpus.js';
 import type { InstallerRule } from '../runtime/installer-engine.js';
@@ -22,6 +24,7 @@ const lowerPredicate = (p: PredicateNode): PredicateExpr => {
   if (p.kind === 'hasFile')  return { kind: 'hasFile',  glob: p.pattern.pattern };
   if (p.kind === 'hasFiles') return { kind: 'hasFiles', globs: p.patterns.map(pat => pat.pattern) };
   if (p.kind === 'matches')  return { kind: 'matches',  regex: p.pattern.pattern };
+  if (p.kind === 'extensions') return { kind: 'extensions', list: p.list, mode: p.mode };
   if (p.kind === 'any')      return { kind: 'any',      arms: p.arms.map(lowerPredicate) };
   if (p.kind === 'all')      return { kind: 'all',      arms: p.arms.map(lowerPredicate) };
   if (p.kind === 'not')      return { kind: 'not',      arm: lowerPredicate(p.arm) };
@@ -33,6 +36,30 @@ const lowerPredicate = (p: PredicateNode): PredicateExpr => {
 };
 
 export const lowerRule = (inst: InstallerNode): InstallerRule => {
+  if (inst.installHook !== undefined) {
+    // Custom install hook: the corpus can't execute it statically, but it can
+    // still recognise the installer and match it on its `when` predicate.
+    return {
+      id: inst.id,
+      priority: inst.priority,
+      when: lowerPredicate(inst.when),
+      ...(inst.unless !== undefined && { unless: lowerPredicate(inst.unless) }),
+      ...(inst.scope !== undefined && { scope: inst.scope }),
+      hookName: inst.installHook,
+      ...(inst.modType !== undefined && { modType: inst.modType }),
+    };
+  }
+  if (inst.copy) {
+    return {
+      id: inst.id,
+      priority: inst.priority,
+      when: lowerPredicate(inst.when),
+      ...(inst.unless !== undefined && { unless: lowerPredicate(inst.unless) }),
+      ...(inst.scope !== undefined && { scope: inst.scope }),
+      copy: { stripCommonRoot: inst.copy.stripCommonRoot },
+      modType: inst.modType!,
+    };
+  }
   if (inst.single) {
     return {
       id: inst.id,
@@ -113,6 +140,7 @@ export interface TestCorpusArgs {
   yamlPath?: string;
   fetch?: boolean;
   modIds?: number[];      // optional list of mod IDs to fetch manifests for
+  limit?: number;         // cap the number of mods fetched during --fetch
 }
 
 export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
@@ -132,6 +160,7 @@ export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
       gameDomain: doc.game.nexusDomain ?? doc.game.id,
       cacheDir: join(args.cwd, 'tests', 'cache'),
       ...(modIds !== undefined && { modIds }),
+      ...(args.limit !== undefined && { limit: args.limit }),
       onProgress: (e) => {
         const sym = e.kind === 'fetched' ? '↓' : e.kind === 'skipped' ? '·' : '✖';
         const tail = 'reason' in e ? `  ${e.reason}` : '';
@@ -164,6 +193,43 @@ export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
   const storeMatrix = stores.length > 0 ? stores : ['steam'];
   const defaultInstallPath = `/games/${doc.game.id}`;
 
+  // Execution mode: when the extension has custom install hooks and is built,
+  // drive the real bundle (hooks + health checks) instead of statically lowering
+  // rules — the faithful equivalent of the old game-extension-test harness.
+  const hasHookInstaller = (doc.installers ?? []).some(i => i.installHook !== undefined);
+  const bundlePath = join(args.cwd, 'dist', 'index.js');
+  if (hasHookInstaller && existsSync(bundlePath)) {
+    const syntheticContent = doc.tests?.syntheticContent ?? {};
+    const ext = loadExtensionBundle(bundlePath);
+    const report = await runExecutionCorpus(ext, archives, syntheticContent);
+    process.stdout.write('\n[execution]\n');
+    for (const e of report.entries) {
+      const name = e.archive.split('/').pop()!;
+      if (e.error) {
+        process.stdout.write(`  ✖ ${name}  ERROR  ${e.error}\n`);
+      } else if (e.healthIssues.length > 0) {
+        process.stdout.write(
+          `  ✖ ${name}  → ${e.matchedInstaller ?? '<none>'}  HEALTH: ${e.healthIssues.join('; ')}\n`,
+        );
+      } else if (e.matchedInstaller) {
+        process.stdout.write(`  ✓ ${name}  → ${e.matchedInstaller} (${e.planSize} files)\n`);
+      } else {
+        process.stdout.write(`  ? ${name}  no installer matched\n`);
+      }
+    }
+    process.stdout.write(
+      `  summary: ${report.matched} matched, ${report.unmatched} unmatched, ${report.failed} failed, ${report.total} total\n`,
+    );
+    if (report.failed > 0) process.exit(1);
+    return;
+  }
+  if (hasHookInstaller) {
+    process.stdout.write(
+      'note: hook installers present but no dist/index.js — run `gdl build` for full ' +
+        'hook + health-check execution; falling back to static attribution.\n',
+    );
+  }
+
   let anyFailed = false;
   for (const store of storeMatrix) {
     const installPath = doc.tests?.scenarios?.[store]?.installPath ?? defaultInstallPath;
@@ -176,7 +242,8 @@ export const runTestCorpus = async (args: TestCorpusArgs): Promise<void> => {
       if (e.error) {
         process.stdout.write(`  ✖ ${name}  ERROR  ${e.error}\n`);
       } else if (e.matchedInstaller) {
-        process.stdout.write(`  ✓ ${name}  → ${e.matchedInstaller} (${e.planSize} files)\n`);
+        const detail = e.viaHook ? 'hook' : `${e.planSize} files`;
+        process.stdout.write(`  ✓ ${name}  → ${e.matchedInstaller} (${detail})\n`);
       } else {
         process.stdout.write(`  ? ${name}  no installer matched\n`);
       }

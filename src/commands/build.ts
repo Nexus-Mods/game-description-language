@@ -29,6 +29,19 @@ const collectHookIds = (doc: DocumentNode): string[] => {
   return [...ids];
 };
 
+// User-named hooks referenced by custom installers and diagnostics; validated
+// for export only (they are not fixed catalog entries).
+const collectExportOnlyHookIds = (doc: DocumentNode): string[] => {
+  const ids = new Set<string>();
+  for (const inst of doc.installers ?? []) {
+    if (inst.installHook) ids.add(inst.installHook);
+  }
+  for (const d of doc.diagnostics ?? []) {
+    ids.add(d.hook);
+  }
+  return [...ids];
+};
+
 export const buildExtension = async (args: BuildArgs): Promise<void> => {
   const yamlPath = args.yamlPath ?? join(args.cwd, 'game.yaml');
   const source = await readFile(yamlPath, 'utf8');
@@ -37,7 +50,7 @@ export const buildExtension = async (args: BuildArgs): Promise<void> => {
   const errors = validate(doc);
   if (errors.length) throw new BuildErrors(errors);
 
-  const hookErrors = await resolveHooks(args.cwd, collectHookIds(doc));
+  const hookErrors = await resolveHooks(args.cwd, collectHookIds(doc), collectExportOnlyHookIds(doc));
   if (hookErrors.length) throw new BuildErrors(hookErrors);
 
   const extensionVersion = await resolveExtensionVersion(doc, args.cwd);

@@ -11,6 +11,67 @@ const makeCtx = () => ({
   api: { getState: () => ({}), events: { on: vi.fn() } },
 }) as unknown as IExtensionContext;
 
+describe('GdlRuntime — custom installer hook', () => {
+  it('testSupported uses `when`; install delegates to the hook with raw paths + destinationPath', async () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+
+    const hook = vi.fn(async (files: readonly string[], destinationPath: string, gid: string) => {
+      void files; void destinationPath; void gid;
+      return {
+        instructions: [
+          { type: 'attribute', key: 'customFileName', value: 'My Mod' },
+          { type: 'copy', source: 'Mod/content.xml', destination: 'out/content.xml' },
+        ],
+      };
+    });
+
+    const rule = {
+      id: 'content-xml',
+      priority: 50,
+      when: { kind: 'hasFile' as const, glob: '**/content.xml' },
+      installHook: hook,
+    };
+    runtime.registerInstallerRulePublic('xrebirth', rule);
+
+    const registerInstaller = ctx.registerInstaller as ReturnType<typeof vi.fn>;
+    const [id, priority, testFn, installFn] = registerInstaller.mock.calls[0]!;
+    expect(id).toBe('content-xml');
+    expect(priority).toBe(50);
+
+    // when matches -> supported
+    expect(await testFn(['Mod/content.xml'], 'xrebirth')).toMatchObject({ supported: true });
+    // when does not match -> not supported
+    expect(await testFn(['Mod/other.txt'], 'xrebirth')).toMatchObject({ supported: false });
+
+    const files = ['Mod\\content.xml', 'Mod\\data\\01.cat'];
+    const result = await installFn(files, '/tmp/install', 'xrebirth');
+    // Hook receives the RAW (un-normalised) Vortex paths and the destinationPath.
+    expect(hook).toHaveBeenCalledWith(files, '/tmp/install', 'xrebirth');
+    // Instructions pass through unchanged (including the attribute instruction).
+    expect(result.instructions).toEqual([
+      { type: 'attribute', key: 'customFileName', value: 'My Mod' },
+      { type: 'copy', source: 'Mod/content.xml', destination: 'out/content.xml' },
+    ]);
+  });
+
+  it('returns no instructions for a different game id', async () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    const hook = vi.fn(async () => ({ instructions: [] }));
+    runtime.registerInstallerRulePublic('xrebirth', {
+      id: 'content-xml', priority: 50,
+      when: { kind: 'hasFile' as const, glob: '**/content.xml' },
+      installHook: hook,
+    });
+    const registerInstaller = ctx.registerInstaller as ReturnType<typeof vi.fn>;
+    const installFn = registerInstaller.mock.calls[0]![3];
+    const result = await installFn(['Mod/content.xml'], '/tmp', 'other-game');
+    expect(result.instructions).toEqual([]);
+    expect(hook).not.toHaveBeenCalled();
+  });
+});
+
 describe('GdlRuntime — installer scope.stores filtering', () => {
   it('skips installer when current store is not in scope', async () => {
     const ctx = makeCtx();
@@ -120,6 +181,58 @@ describe('GdlRuntime — installer scope.stores filtering', () => {
         { type: 'setmodtype', value: 'injector' },
       ],
     });
+  });
+});
+
+describe('GdlRuntime — environment.SteamAPPId derivation', () => {
+  it('sets environment.SteamAPPId from the steam store (details.steamAppId comes from deriveStoreDetails)', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    runtime.registerGame(
+      { id: 'xrebirth', name: 'X Rebirth', executable: 'XRebirth.exe', requiredFiles: ['XRebirth.exe'] },
+      [{ id: 'steam', value: '2870' }],
+      { bindings: [] },
+      [],
+    );
+    const registerGame = ctx.registerGame as ReturnType<typeof vi.fn>;
+    const game = registerGame.mock.calls[0]![0];
+    // environment is an env-var bag, so the app id stays a string here, while
+    // details.steamAppId is the numeric form coerced by deriveStoreDetails.
+    expect(game.environment).toEqual({ SteamAPPId: '2870' });
+    expect(game.details.steamAppId).toBe(2870);
+  });
+
+  it('omits steam-derived fields when there is no steam store', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    runtime.registerGame(
+      { id: 'g', name: 'G', executable: 'G.exe', requiredFiles: ['G.exe'] },
+      [{ id: 'gog', value: '123' }],
+      { bindings: [] },
+      [],
+    );
+    const registerGame = ctx.registerGame as ReturnType<typeof vi.fn>;
+    const game = registerGame.mock.calls[0]![0];
+    expect(game.environment).toBeUndefined();
+    expect(game.details.steamAppId).toBeUndefined();
+  });
+});
+
+describe('GdlRuntime — nexusDomain in details', () => {
+  it('maps nexusDomain to details.nexusPageId', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+
+    runtime.registerGame(
+      { id: 'test', name: 'Test', executable: 'Test.exe', requiredFiles: ['Test.exe'], nexusDomain: 'testgame' },
+      [],
+      { bindings: [] },
+      [],
+    );
+
+    const registerGame = ctx.registerGame as ReturnType<typeof vi.fn>;
+    const game = registerGame.mock.calls[0]![0];
+    expect(game.details.nexusPageId).toBe('testgame');
   });
 });
 

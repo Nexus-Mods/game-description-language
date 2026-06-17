@@ -1,5 +1,5 @@
 import { readArchiveEntries } from './archive.js';
-import { buildInstallPlan, type InstallerRule, type InstallInstruction } from '../runtime/installer-engine.js';
+import { buildInstallPlan, ruleSupports, type InstallerRule, type InstallInstruction } from '../runtime/installer-engine.js';
 
 export interface CorpusEntry {
   archive: string;
@@ -8,6 +8,8 @@ export interface CorpusEntry {
   planSize: number;
   /** Full install plan of the matched installer; used by placement validators. */
   plan?: readonly InstallInstruction[];
+  /** True when the match is a custom install hook whose plan was not computed statically. */
+  viaHook?: boolean;
   error?: string;
 }
 
@@ -48,21 +50,32 @@ export const runCorpus = (
   for (const archive of archivePaths) {
     try {
       const files = readArchiveEntries(archive);
-      const ctx = { archivePaths: files, vars: opts.vars };
+      const ctx = {
+        archivePaths: files,
+        vars: opts.vars,
+      };
       let matchedRule: InstallerRule | undefined;
       let plan: InstallInstruction[] = [];
+      let viaHook = false;
       for (const rule of sortedRules) {
+        if (rule.hookName !== undefined) {
+          // Custom install hook: can't build a plan statically, so match on the
+          // `when`/`unless` predicate (the same gate the runtime shim applies).
+          if (ruleSupports(rule, ctx)) { matchedRule = rule; plan = []; viaHook = true; break; }
+          continue;
+        }
         const result = buildInstallPlan(rule, files, ctx);
         if (result.length > 0) { matchedRule = rule; plan = result; break; }
       }
       if (matchedRule) {
-        const modType = plan[0]?.modType;
+        const modType = plan[0]?.modType ?? matchedRule.modType;
         entries.push({
           archive,
           planSize: plan.length,
           matchedInstaller: matchedRule.id,
           plan,
           ...(modType !== undefined && { matchedModType: modType }),
+          ...(viaHook && { viaHook: true }),
         });
         matched++;
       } else {

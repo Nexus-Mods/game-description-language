@@ -1,0 +1,16 @@
+{
+  "name": "",
+  "path": "",
+  "type": "directory",
+  "children": [
+    {
+      "name": "MyMod",
+      "path": "MyMod",
+      "type": "directory",
+      "children": [
+        { "name": "content.xml", "path": "MyMod/content.xml", "type": "file", "size": "128" },
+        { "name": "data.cat", "path": "MyMod/data.cat", "type": "file", "size": "4096" }
+      ]
+    }
+  ]
+}

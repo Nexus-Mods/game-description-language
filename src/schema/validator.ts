@@ -164,14 +164,17 @@ export const validate = (doc: DocumentNode): BuildError[] => {
 
       const hasSingle = inst.single !== undefined;
       const hasRoute  = inst.route  !== undefined;
-      if (hasSingle === hasRoute) {
+      const hasCopy   = inst.copy   !== undefined;
+      const hasHook   = inst.installHook !== undefined;
+      const formCount = (hasSingle ? 1 : 0) + (hasRoute ? 1 : 0) + (hasCopy ? 1 : 0) + (hasHook ? 1 : 0);
+      if (formCount !== 1) {
         errors.push({
           code: 'GDL112',
-          message: 'installer must have exactly one of `single` (anchor/take/placeAt/modType) or `route`',
+          message: 'installer must have exactly one of `single` (anchor/take/placeAt/modType), `route`, `copy` (stripCommonRoot/modType), or `install` (hook)',
           span: inst.span,
         });
       }
-      if (hasSingle) {
+      const checkModTypeDeclared = (): string => {
         const mt = inst.modType ?? '';
         if (!declaredModTypes.has(mt)) {
           errors.push({
@@ -183,7 +186,26 @@ export const validate = (doc: DocumentNode): BuildError[] => {
               : 'no modTypes declared',
           });
         }
+        return mt;
+      };
+      if (hasSingle) {
+        const mt = checkModTypeDeclared();
+        // copy form deploys to the modType path directly (no placeAt), so it
+        // has nothing to reconcile; single form's placeAt must agree.
         checkPlaceAt(inst.single!.placeAt, mt, inst.span, `installer \`${inst.id}\``);
+      }
+      if (hasCopy) {
+        checkModTypeDeclared();
+      }
+      if (hasHook && inst.modType !== undefined && !declaredModTypes.has(inst.modType)) {
+        errors.push({
+          code: 'GDL110',
+          message: `installer \`${inst.id}\` references undeclared modType \`${inst.modType}\``,
+          span: inst.span,
+          hint: declaredModTypes.size
+            ? `declared modTypes: ${[...declaredModTypes].join(', ')}`
+            : 'no modTypes declared',
+        });
       }
       if (hasRoute) {
         for (const r of inst.route!) {
@@ -290,6 +312,28 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.diagnostics) {
+    const seenHooks = new Set<string>();
+    for (const d of doc.diagnostics) {
+      if (!d.hook.trim()) {
+        errors.push({
+          code: 'GDL192',
+          message: 'diagnostic `hook` must not be empty',
+          span: d.span,
+        });
+        continue;
+      }
+      if (seenHooks.has(d.hook)) {
+        errors.push({
+          code: 'GDL193',
+          message: `duplicate diagnostic hook \`${d.hook}\``,
+          span: d.span,
+        });
+      }
+      seenHooks.add(d.hook);
+    }
+  }
+
   if (doc.nexus) {
     if (!Number.isInteger(doc.nexus.modId) || doc.nexus.modId <= 0) {
       errors.push({
@@ -313,6 +357,7 @@ export const validate = (doc: DocumentNode): BuildError[] => {
       });
     }
   }
+
 
   if (doc.toolbarActions) {
     const seen = new Set<string>();

@@ -73,6 +73,10 @@ const renderPredicate = (p: PredicateNode): string => {
     return `{ kind: 'hasFiles', globs: [${globs}] }`;
   }
   if (p.kind === 'matches') return `{ kind: 'matches', regex: ${sq(p.pattern.pattern)} }`;
+  if (p.kind === 'extensions') {
+    const list = p.list.map(sq).join(', ');
+    return `{ kind: 'extensions', list: [${list}], mode: ${sq(p.mode)} }`;
+  }
   if (p.kind === 'when') return `{ kind: 'when', expr: ${renderComparison(p.expr)} }`;
   if (p.kind === 'any')  return `{ kind: 'any', arms: [${p.arms.map(renderPredicate).join(', ')}] }`;
   if (p.kind === 'all')  return `{ kind: 'all', arms: [${p.arms.map(renderPredicate).join(', ')}] }`;
@@ -98,7 +102,13 @@ const renderInstaller = (inst: InstallerNode): string => {
     const storesLit = inst.scope.stores.map(s => sq(s)).join(', ');
     parts.push(`scope: { stores: [${storesLit}] }`);
   }
-  if (inst.single) {
+  if (inst.installHook) {
+    parts.push(`installHook: hooks.${inst.installHook}`);
+    if (inst.modType !== undefined) parts.push(`modType: ${sq(inst.modType)}`);
+  } else if (inst.copy) {
+    parts.push(`copy: { stripCommonRoot: ${inst.copy.stripCommonRoot} }`);
+    parts.push(`modType: ${sq(inst.modType ?? '')}`);
+  } else if (inst.single) {
     parts.push(`single: { anchor: ${renderPattern(inst.single.anchor)}, take: ${renderTake(inst.single.take)}, placeAt: ${renderPlaceAt(inst.single.placeAt)} }`);
     parts.push(`modType: ${sq(inst.modType ?? '')}`);
   } else if (inst.route) {
@@ -145,10 +155,17 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     ? `      didDeploy: ${didDeployRef},`
     : '';
 
+  const diagnosticsLines = (doc.diagnostics ?? [])
+    .map(d => `      hooks.${d.hook}`)
+    .join(',\n');
+
   const hookIds = new Set<string>();
   const versionNode = doc.discovery?.version;
   if (versionNode?.kind === 'hookRef') hookIds.add(versionNode.hookId);
-  const hookImports = hookIds.size
+  // The `hooks` namespace import is needed when the version hook or any
+  // diagnostic references `hooks.<name>`.
+  const needsHooksNamespace = hookIds.size > 0 || (doc.diagnostics?.length ?? 0) > 0;
+  const hookImports = needsHooksNamespace
     ? `import * as hooks from '../src/hooks.js';`
     : '';
 
@@ -184,9 +201,16 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
 
   const reqFiles = `[${doc.game.requiredFiles.map(sq).join(', ')}]`;
 
+  // Custom installer hooks live in src/hooks.ts; installers.gen.ts references
+  // them by name, so import the hooks module when any installer uses one.
+  const usesInstallerHooks = (doc.installers ?? []).some(i => i.installHook !== undefined);
+  const installerHookImport = usesInstallerHooks
+    ? `import * as hooks from '../src/hooks.js';\n`
+    : '';
+
   const installersFile = `${banner(doc.game.span.file)}
 import type { InstallerRule } from '@gdl/runtime';
-
+${installerHookImport}
 export const rules: InstallerRule[] = [
 ${installers}
 ];
@@ -237,6 +261,9 @@ ${setupDirsLines}
     {
 ${eventHooksBody}
     },
+    [
+${diagnosticsLines}
+    ],
   );
   return true;
 }
