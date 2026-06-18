@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseYaml } from "../src/parser/index.js";
+import { validate } from "../src/schema/validator.js";
 
 const YAML = `gdl: 1
 game:
@@ -43,5 +44,83 @@ describe("parser: setup.requireFiles", () => {
             kind: "url",
             url: "https://example.com/umm",
         });
+    });
+});
+
+const baseYaml = (rf: string) => `gdl: 1
+game:
+  id: g
+  name: G
+  executable: G.exe
+  requiredFiles: [G.exe]
+stores:
+  steam: "1"
+setup:
+  ensureDirs:
+    - \${installPath}/Mods
+  requireFiles:
+${rf}
+`;
+
+describe("validator: setup.requireFiles", () => {
+    it("accepts a well-formed requireFiles block", () => {
+        const doc = parseYaml(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: T
+      message: M
+      link:
+        label: L
+        mod: { domain: site, modId: 21 }`,
+            ),
+            "rf.yaml",
+        );
+        expect(validate(doc).filter((e) => e.code.startsWith("GDL15"))).toEqual([]);
+    });
+
+    it("rejects an empty files list", () => {
+        const doc = parseYaml(
+            baseYaml(
+                `    files: []
+    prompt:
+      title: T
+      message: M`,
+            ),
+            "rf.yaml",
+        );
+        expect(validate(doc).some((e) => e.code === "GDL153")).toBe(true);
+    });
+
+    it("rejects a missing prompt title", () => {
+        const doc = parseYaml(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: ""
+      message: M`,
+            ),
+            "rf.yaml",
+        );
+        expect(validate(doc).some((e) => e.code === "GDL154")).toBe(true);
+    });
+
+    it("rejects a link with an empty mod domain", () => {
+        const doc = parseYaml(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: T
+      message: M
+      link:
+        label: L
+        mod: { domain: "", modId: 21 }`,
+            ),
+            "rf.yaml",
+        );
+        expect(validate(doc).some((e) => e.code === "GDL155")).toBe(true);
     });
 });

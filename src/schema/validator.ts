@@ -397,6 +397,68 @@ export const validate = (doc: DocumentNode): BuildError[] => {
         });
       }
     }
+    const rf = doc.setup.requireFiles;
+    if (rf) {
+      if (rf.files.length === 0) {
+        errors.push({
+          code: 'GDL153',
+          message: 'setup.requireFiles.files must not be empty',
+          span: doc.setup.span,
+        });
+      }
+      rf.files.forEach((f, i) => {
+        if (f.trim() === '') {
+          errors.push({
+            code: 'GDL153',
+            message: `setup.requireFiles.files[${i}] must not be empty`,
+            span: doc.setup!.span,
+          });
+        }
+      });
+      if (rf.prompt.title.trim() === '') {
+        errors.push({
+          code: 'GDL154',
+          message: 'setup.requireFiles.prompt.title must not be empty',
+          span: doc.setup.span,
+        });
+      }
+      if (rf.prompt.message.trim() === '') {
+        errors.push({
+          code: 'GDL154',
+          message: 'setup.requireFiles.prompt.message must not be empty',
+          span: doc.setup.span,
+        });
+      }
+      if (rf.prompt.link) {
+        const link = rf.prompt.link;
+        if (link.label.trim() === '') {
+          errors.push({
+            code: 'GDL155',
+            message: 'setup.requireFiles.prompt.link.label must not be empty',
+            span: doc.setup.span,
+          });
+        }
+        if (
+          link.target.kind === 'mod' &&
+          (link.target.domain.trim() === '' ||
+            !Number.isFinite(link.target.modId) ||
+            link.target.modId <= 0)
+        ) {
+          errors.push({
+            code: 'GDL155',
+            message: 'setup.requireFiles.prompt.link.mod needs a domain and a positive modId',
+            span: doc.setup.span,
+          });
+        }
+        if (link.target.kind === 'url' && link.target.url.trim() === '') {
+          errors.push({
+            code: 'GDL155',
+            message: 'setup.requireFiles.prompt.link.url must not be empty',
+            span: doc.setup.span,
+          });
+        }
+      }
+    }
   }
   // events.did-deploy: structural validation done in parser.
   // Hook resolution happens in the build step (alongside discovery.version's hook).
