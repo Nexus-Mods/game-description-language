@@ -5,6 +5,7 @@ import { GdlRuntime } from "../src/runtime/index.js";
 import { createFakeContext } from "../src/runtime/testing/index.js";
 import type { IExtensionContext } from "vortex-api";
 import { vi } from "vitest";
+import { emit } from "../src/codegen/emit.js";
 
 const YAML = `gdl: 1
 game:
@@ -192,5 +193,61 @@ describe("runtime: setup.requireFiles", () => {
         );
         await h.registered.game!.setup!({ path: "/games/g", store: "steam" });
         expect(dialogMock(h)).not.toHaveBeenCalled();
+    });
+});
+
+describe("codegen: setup.requireFiles", () => {
+    const extOf = (yaml: string) => {
+        const doc = parseYaml(yaml, "rf.yaml");
+        return emit(doc).find((f) => f.path.endsWith("extension.ts"))!.contents;
+    };
+
+    it("builds a nexus mod page URL from a mod target", () => {
+        const ext = extOf(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: Action required
+      message: Install UMM
+      link:
+        label: Get UMM
+        mod: { domain: site, modId: 21 }`,
+            ),
+        );
+        expect(ext).toContain("'https://www.nexusmods.com/site/mods/21'");
+        expect(ext).toContain("Action required");
+    });
+
+    it("passes a url target through unchanged", () => {
+        const ext = extOf(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: T
+      message: M
+      link:
+        label: L
+        url: https://example.com/umm`,
+            ),
+        );
+        expect(ext).toContain("'https://example.com/umm'");
+    });
+
+    it("emits undefined when no requireFiles is declared", () => {
+        const ext = extOf(`gdl: 1
+game:
+  id: g
+  name: G
+  executable: G.exe
+  requiredFiles: [G.exe]
+stores:
+  steam: "1"
+setup:
+  ensureDirs:
+    - \${installPath}/Mods`);
+        // The 11th registerGame argument is the requireFiles literal.
+        expect(ext).toMatch(/\],\s*undefined,\s*\);/);
     });
 });

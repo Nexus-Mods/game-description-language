@@ -150,6 +150,20 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     .map(d => `      ${sq(d)}`)
     .join(',\n');
 
+  const requireFilesLit = (() => {
+    const rf = doc.setup?.requireFiles;
+    if (!rf) return 'undefined';
+    const filesLit = `[${rf.files.map(sq).join(', ')}]`;
+    let linkLit = '';
+    if (rf.prompt.link) {
+      const t = rf.prompt.link.target;
+      const url =
+        t.kind === 'url' ? t.url : `https://www.nexusmods.com/${t.domain}/mods/${t.modId}`;
+      linkLit = `, link: { label: ${sq(rf.prompt.link.label)}, url: ${sq(url)} }`;
+    }
+    return `{ files: ${filesLit}, prompt: { title: ${sq(rf.prompt.title)}, message: ${sq(rf.prompt.message)}${linkLit} } }`;
+  })();
+
   const didDeployRef = doc.events?.didDeploy?.hookId;
   const eventHooksBody = didDeployRef
     ? `      didDeploy: ${didDeployRef},`
@@ -264,6 +278,7 @@ ${eventHooksBody}
     [
 ${diagnosticsLines}
     ],
+    ${requireFilesLit},
   );
   return true;
 }
