@@ -7,6 +7,7 @@ import type {
   TestsNode, TestCaseNode, ExpectNode, CorpusMode,
   ValidatorNode, ValidatorAssertNode, PlacementAssertNode,
   NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode, DiagnosticNode,
+  RequireFilesNode, RequireFilesLink, RequireFilesTarget,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -536,6 +537,71 @@ const parseValidatorsBlock = (node: YamlNode, file: string, source: string): Val
   return validators;
 };
 
+function parseRequireFiles(node: YamlNode, file: string, source: string): RequireFilesNode {
+  const mapNode = isMap(node) ? node : null;
+  if (!mapNode) {
+    throw new BuildErrors([{
+      code: 'GDL153',
+      message: 'setup.requireFiles must be a mapping',
+      span: spanOf(file, source, node),
+    }]);
+  }
+
+  const files: string[] = [];
+  const filesYaml = mapNode.get('files', true);
+  if (isSeq(filesYaml)) {
+    for (const item of filesYaml.items) {
+      if (isScalar(item) && typeof item.value === 'string') {
+        files.push(item.value);
+      } else {
+        throw new BuildErrors([{
+          code: 'GDL153',
+          message: 'setup.requireFiles.files entries must be strings',
+          span: spanOf(file, source, item as YamlNode),
+        }]);
+      }
+    }
+  }
+
+  const promptYaml = mapNode.get('prompt', true);
+  if (!isMap(promptYaml)) {
+    throw new BuildErrors([{
+      code: 'GDL154',
+      message: 'setup.requireFiles.prompt must be a mapping with title and message',
+      span: spanOf(file, source, mapNode),
+    }]);
+  }
+  const title = String(promptYaml.get('title') ?? '');
+  const message = String(promptYaml.get('message') ?? '');
+
+  let link: RequireFilesLink | undefined;
+  const linkYaml = promptYaml.get('link', true);
+  if (isMap(linkYaml)) {
+    const label = String(linkYaml.get('label') ?? '');
+    const modYaml = linkYaml.get('mod', true);
+    const urlYaml = linkYaml.get('url', true);
+    let target: RequireFilesTarget;
+    if (isMap(modYaml)) {
+      target = {
+        kind: 'mod',
+        domain: String(modYaml.get('domain') ?? ''),
+        modId: Number(modYaml.get('modId') ?? 0),
+      };
+    } else if (isScalar(urlYaml) && typeof urlYaml.value === 'string') {
+      target = { kind: 'url', url: urlYaml.value };
+    } else {
+      throw new BuildErrors([{
+        code: 'GDL156',
+        message: 'setup.requireFiles.prompt.link must set exactly one of `mod` or `url`',
+        span: spanOf(file, source, linkYaml),
+      }]);
+    }
+    link = { label, target };
+  }
+
+  return { files, prompt: { title, message, ...(link !== undefined && { link }) } };
+}
+
 const parseToolbarActionTarget = (node: YamlNode, file: string, source: string): ToolbarActionTarget => {
   const span = spanOf(file, source, node);
   if (isMap(node) && (typeof node.tag !== 'string' || node.tag === '')) {
@@ -899,9 +965,15 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
         }
       }
     }
+    let requireFiles: RequireFilesNode | undefined;
+    const rfYaml = setupYaml.get('requireFiles', true);
+    if (isMap(rfYaml)) {
+      requireFiles = parseRequireFiles(rfYaml, file, source);
+    }
     setup = {
       kind: 'setup',
       ensureDirs: dirs,
+      ...(requireFiles !== undefined && { requireFiles }),
       span: spanOf(file, source, setupYaml),
     };
   }
