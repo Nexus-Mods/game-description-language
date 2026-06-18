@@ -581,7 +581,13 @@ function parseRequireFiles(node: YamlNode, file: string, source: string): Requir
     const modYaml = linkYaml.get('mod', true);
     const urlYaml = linkYaml.get('url', true);
     let target: RequireFilesTarget;
-    if (isMap(modYaml)) {
+    if (isMap(modYaml) && isScalar(urlYaml) && typeof urlYaml.value === 'string') {
+      throw new BuildErrors([{
+        code: 'GDL156',
+        message: 'setup.requireFiles.prompt.link must set exactly one of `mod` or `url`, not both',
+        span: spanOf(file, source, linkYaml),
+      }]);
+    } else if (isMap(modYaml)) {
       target = {
         kind: 'mod',
         domain: String(modYaml.get('domain') ?? ''),

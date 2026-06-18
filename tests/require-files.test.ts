@@ -50,6 +50,21 @@ describe("parser: setup.requireFiles", () => {
             url: "https://example.com/umm",
         });
     });
+
+    it("throws GDL156 when both mod and url are set on a link", () => {
+        const yaml = baseYaml(
+            `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: T
+      message: M
+      link:
+        label: L
+        mod: { domain: site, modId: 21 }
+        url: https://example.com`,
+        );
+        expect(() => parseYaml(yaml, "rf.yaml")).toThrow();
+    });
 });
 
 const baseYaml = (rf: string) => `gdl: 1
@@ -123,6 +138,71 @@ describe("validator: setup.requireFiles", () => {
       link:
         label: L
         mod: { domain: "", modId: 21 }`,
+            ),
+            "rf.yaml",
+        );
+        expect(validate(doc).some((e) => e.code === "GDL155")).toBe(true);
+    });
+
+    it("rejects an empty prompt message", () => {
+        const doc = parseYaml(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: T
+      message: ""`,
+            ),
+            "rf.yaml",
+        );
+        expect(validate(doc).some((e) => e.code === "GDL154")).toBe(true);
+    });
+
+    it("rejects a link with an empty label", () => {
+        const doc = parseYaml(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: T
+      message: M
+      link:
+        label: ""
+        mod: { domain: site, modId: 21 }`,
+            ),
+            "rf.yaml",
+        );
+        expect(validate(doc).some((e) => e.code === "GDL155")).toBe(true);
+    });
+
+    it("rejects a link with an empty url", () => {
+        const doc = parseYaml(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: T
+      message: M
+      link:
+        label: L
+        url: ""`,
+            ),
+            "rf.yaml",
+        );
+        expect(validate(doc).some((e) => e.code === "GDL155")).toBe(true);
+    });
+
+    it("rejects a mod target with modId 0", () => {
+        const doc = parseYaml(
+            baseYaml(
+                `    files:
+      - \${installPath}/x.dll
+    prompt:
+      title: T
+      message: M
+      link:
+        label: L
+        mod: { domain: site, modId: 0 }`,
             ),
             "rf.yaml",
         );
