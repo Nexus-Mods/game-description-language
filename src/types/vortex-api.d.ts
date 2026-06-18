@@ -95,6 +95,12 @@ declare module 'vortex-api' {
       events: {
         on: (event: string, handler: (...args: unknown[]) => void) => void;
       };
+      showDialog: (
+        type: string,
+        title: string,
+        content: { text?: string; message?: string; bbcode?: string },
+        actions: Array<{ label: string; action?: () => void }>,
+      ) => Promise<unknown>;
     };
   }
 
@@ -115,6 +121,7 @@ declare module 'vortex-api' {
 
   export const fs: {
     ensureDirWritableAsync: (path: string) => Promise<void>;
+    statAsync: (path: string) => Promise<{ isDirectory: () => boolean }>;
   };
 
   export const util: {
