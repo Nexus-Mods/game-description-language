@@ -248,7 +248,31 @@ export interface ToolbarActionNode extends Node {
 export interface SetupNode extends Node {
   kind: 'setup';
   ensureDirs: string[];   // path templates, interpolated against context
+  requireFiles?: RequireFilesNode;
 }
+
+// Declarative prerequisite check: stat a list of files at setup time and, when
+// any are missing, show an informational dialog that points the user at a mod
+// page or URL to download the missing prerequisite (e.g. Unity Mod Manager).
+export interface RequireFilesNode {
+  files: string[]; // path templates, interpolated against context
+  prompt: RequireFilesPrompt;
+}
+
+export interface RequireFilesPrompt {
+  title: string;
+  message: string;
+  link?: RequireFilesLink;
+}
+
+export interface RequireFilesLink {
+  label: string; // button text
+  target: RequireFilesTarget;
+}
+
+export type RequireFilesTarget =
+  | { kind: 'mod'; domain: string; modId: number }
+  | { kind: 'url'; url: string };
 
 // Wired in Task 2. Stub now so DocumentNode compiles.
 export interface EventsNode extends Node {
