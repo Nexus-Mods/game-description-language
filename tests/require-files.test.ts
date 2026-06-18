@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { parseYaml } from "../src/parser/index.js";
 import { validate } from "../src/schema/validator.js";
+import { GdlRuntime } from "../src/runtime/index.js";
+import { createFakeContext } from "../src/runtime/testing/index.js";
+import type { IExtensionContext } from "vortex-api";
+import { vi } from "vitest";
 
 const YAML = `gdl: 1
 game:
@@ -122,5 +126,71 @@ describe("validator: setup.requireFiles", () => {
             "rf.yaml",
         );
         expect(validate(doc).some((e) => e.code === "GDL155")).toBe(true);
+    });
+});
+
+const RT_DECL = { id: "g", name: "G", executable: "G.exe", requiredFiles: ["G.exe"] };
+const RT_STORES = [{ id: "steam", value: "1" }];
+const RT_CTX = { bindings: [] };
+const RT_MODTYPES: never[] = [];
+const RT_RF = {
+    files: ["${installPath}/UnityModManager/UnityModManager.dll"],
+    prompt: {
+        title: "Action required",
+        message: "Install UMM",
+        link: { label: "Get UMM", url: "https://www.nexusmods.com/site/mods/21" },
+    },
+};
+
+const dialogMock = (h: ReturnType<typeof createFakeContext>) =>
+    (h.context as unknown as { api: { showDialog: ReturnType<typeof vi.fn> } }).api.showDialog;
+
+describe("runtime: setup.requireFiles", () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it("shows the prompt when a required file is missing", async () => {
+        const { fs } = await import("vortex-api");
+        vi.mocked(fs.statAsync).mockRejectedValue(new Error("ENOENT"));
+        const h = createFakeContext();
+        const runtime = new GdlRuntime(h.context as IExtensionContext);
+        runtime.registerGame(
+            RT_DECL,
+            RT_STORES,
+            RT_CTX,
+            RT_MODTYPES,
+            [],
+            {},
+            [],
+            [],
+            {},
+            [],
+            RT_RF,
+        );
+        const g = h.registered.game!;
+        await g.setup!({ path: "/games/g", store: "steam" });
+        expect(dialogMock(h)).toHaveBeenCalledTimes(1);
+        expect(dialogMock(h).mock.calls[0][1]).toBe("Action required");
+    });
+
+    it("stays silent when all required files exist", async () => {
+        const { fs } = await import("vortex-api");
+        vi.mocked(fs.statAsync).mockResolvedValue({ isDirectory: () => false });
+        const h = createFakeContext();
+        const runtime = new GdlRuntime(h.context as IExtensionContext);
+        runtime.registerGame(
+            RT_DECL,
+            RT_STORES,
+            RT_CTX,
+            RT_MODTYPES,
+            [],
+            {},
+            [],
+            [],
+            {},
+            [],
+            RT_RF,
+        );
+        await h.registered.game!.setup!({ path: "/games/g", store: "steam" });
+        expect(dialogMock(h)).not.toHaveBeenCalled();
     });
 });

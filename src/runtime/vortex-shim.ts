@@ -80,6 +80,15 @@ export interface EventHooks {
   didDeploy?: DidDeployHook;
 }
 
+export interface RequireFilesSpec {
+  files: string[];
+  prompt: {
+    title: string;
+    message: string;
+    link?: { label: string; url: string };
+  };
+}
+
 export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
   private cachedFacts?: DiscoveryFacts;
@@ -132,6 +141,7 @@ export class GdlRuntime {
     setupDirs: string[] = [],
     eventHooks: EventHooks = {},
     diagnostics: IModHealthCheck[] = [],
+    requireFiles?: RequireFilesSpec,
   ) {
     // Mirror Vortex's environment.SteamAPPId auto-derivation: queryArgs.steam
     // would set it so the launched game sees the right app id. GDL discovers via
@@ -198,7 +208,7 @@ export class GdlRuntime {
         return await versionHook(facts) ?? '0.0.0';
       };
     }
-    if (setupDirs.length > 0) {
+    if (setupDirs.length > 0 || requireFiles !== undefined) {
       game.setup = async (discovery: IDiscoveryResult) => {
         const { fs } = await import('vortex-api');
         // Vortex's discovery is the authoritative source for installPath at
@@ -212,6 +222,9 @@ export class GdlRuntime {
         for (const tpl of setupDirs) {
           const path = interpolate(tpl, this.resolvedCtx);
           await fs.ensureDirWritableAsync(path);
+        }
+        if (requireFiles !== undefined) {
+          await this.runRequireFilesCheck(requireFiles);
         }
       };
     }
@@ -264,6 +277,33 @@ export class GdlRuntime {
     for (const check of diagnostics) {
       this.api.registerHealthCheck(check);
     }
+  }
+
+  // Setup-time prerequisite check. Resolve each declared file template against
+  // the current context and stat it. If any are missing, show an informational
+  // dialog that points the user at a download. Non-fatal: it never rejects setup.
+  private async runRequireFilesCheck(spec: RequireFilesSpec): Promise<void> {
+    const { fs, util } = await import('vortex-api');
+    const ctx = this.resolvedCtx ?? ({} as ResolvedContext);
+    const resolved = spec.files.map((tpl) => interpolate(tpl, ctx));
+    const present = await Promise.all(
+      resolved.map(async (p) => {
+        try {
+          await fs.statAsync(p);
+          return true;
+        } catch {
+          return false;
+        }
+      }),
+    );
+    if (present.every(Boolean)) return;
+
+    const actions: Array<{ label: string; action?: () => void }> = [{ label: 'Close' }];
+    if (spec.prompt.link) {
+      const { label, url } = spec.prompt.link;
+      actions.push({ label, action: () => { void util.opn(url).catch(() => undefined); } });
+    }
+    void this.api.api.showDialog('info', spec.prompt.title, { text: spec.prompt.message }, actions);
   }
 
   private registerInstallerRule(gameId: string, rule: InstallerRule): void {
