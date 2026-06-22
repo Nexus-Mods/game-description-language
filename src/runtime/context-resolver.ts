@@ -19,6 +19,8 @@ export interface DiscoveryFacts {
   appDataLocal?: string;      // Windows: %LOCALAPPDATA%
   appDataLocalLow?: string;   // Windows: %LOCALAPPDATA%/../LocalLow
   appDataRoaming?: string;    // Windows: %APPDATA%
+  documents?: string;         // user Documents folder (Vortex getVortexPath('documents'))
+  home?: string;              // user home folder (Vortex getVortexPath('home'))
   version?: string;
 }
 

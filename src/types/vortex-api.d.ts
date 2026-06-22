@@ -126,6 +126,8 @@ declare module 'vortex-api' {
 
   export const util: {
     opn: (target: string) => Promise<void>;
+    // Resolve a well-known folder by id (e.g. 'documents', 'home', 'appData').
+    getVortexPath: (id: string) => string;
     GameStoreHelper: {
       findByAppId(appId: string | string[], storeId?: string): Promise<IFoundGame | null>;
     };

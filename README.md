@@ -123,7 +123,7 @@ through to the default arm).
 
 ### Context bindings
 
-The `context:` block defines path templates and values that other blocks reference via `${name}`. Branch on the discovered store, OS, or version:
+The `context:` block defines path templates and values that other blocks reference via `${name}`. Built-in variables resolved from discovery are available everywhere a template is accepted (context, modType paths, `queryModPath`, `setup.ensureDirs`): `${installPath}`, `${documents}` (user Documents folder, redirection-aware), `${home}` (user home folder), `${appDataLocal}`, `${appDataLocalLow}`, `${appDataRoaming}`, plus `${store}`/`${os}`/`${arch}`/`${version}`. Branch on the discovered store, OS, or version:
 
 ```yaml
 context:

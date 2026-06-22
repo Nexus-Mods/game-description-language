@@ -450,3 +450,50 @@ describe('GdlRuntime — discovery fallbacks', () => {
     expect(vortex.util.steam.findByName).not.toHaveBeenCalled();
   });
 });
+
+describe('GdlRuntime — ${documents} / ${home} context vars', () => {
+  const emptyCtxSpec = { bindings: [] } as unknown as ContextSpec;
+  const registeredGame = (ctx: IExtensionContext) =>
+    (ctx.registerGame as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+
+  it('resolves ${documents} in queryModPath via getVortexPath', async () => {
+    const vortex = await import('vortex-api');
+    (vortex.util.GameStoreHelper.findByAppId as ReturnType<typeof vi.fn>).mockReset()
+      .mockResolvedValue({ gamePath: '/games/g', gameStoreId: 'steam' });
+    (vortex.util.getVortexPath as ReturnType<typeof vi.fn>).mockReset()
+      .mockImplementation((id: string) => (id === 'documents' ? 'D:/Docs' : id === 'home' ? 'C:/Users/x' : ''));
+
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { id: 'g', name: 'G', executable: 'g.exe', requiredFiles: ['g.exe'], queryModPath: '${documents}/G/Mods' },
+      [{ id: 'steam', value: '1' }],
+      emptyCtxSpec,
+      [],
+    );
+    const game = registeredGame(ctx);
+    await game.queryPath();
+    expect(game.queryModPath('/games/g')).toBe('D:/Docs/G/Mods');
+  });
+
+  it('resolves ${home} in setup.ensureDirs via getVortexPath', async () => {
+    const vortex = await import('vortex-api');
+    (vortex.util.getVortexPath as ReturnType<typeof vi.fn>).mockReset()
+      .mockImplementation((id: string) => (id === 'home' ? 'C:/Users/x' : id === 'documents' ? 'D:/Docs' : ''));
+    (vortex.fs.ensureDirWritableAsync as ReturnType<typeof vi.fn>).mockReset().mockResolvedValue(undefined);
+
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { id: 'g', name: 'G', executable: 'g.exe', requiredFiles: ['g.exe'] },
+      [{ id: 'steam', value: '1' }],
+      emptyCtxSpec,
+      [],
+      [],
+      {},
+      [],
+      ['${home}/.config/g'],
+    );
+    const game = registeredGame(ctx);
+    await game.setup!({ path: '/games/g', store: 'steam' });
+    expect(vortex.fs.ensureDirWritableAsync).toHaveBeenCalledWith('C:/Users/x/.config/g');
+  });
+});

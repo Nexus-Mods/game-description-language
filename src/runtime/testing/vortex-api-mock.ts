@@ -35,6 +35,9 @@ export const util = {
     findByName: vi.fn<(name: string) => Promise<{ gamePath: string } | null>>(),
   },
   opn: vi.fn((_url: string) => Promise.resolve()),
+  // Resolve a well-known folder (e.g. 'documents', 'home'). Real Vortex handles
+  // OS + redirection (OneDrive Documents, etc.); tests stub the return.
+  getVortexPath: vi.fn<(id: string) => string>(() => ''),
   // Lookup helper from Vortex's util — hook authors use this to walk redux
   // state without throwing on missing keys.
   getSafe: <T>(obj: unknown, path: readonly (string | number)[], fallback: T): T => {

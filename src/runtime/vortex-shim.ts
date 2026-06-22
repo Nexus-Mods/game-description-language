@@ -125,7 +125,7 @@ export class GdlRuntime {
   // Vortex's own discovery includes sideloaded games and user-edited paths that
   // findByAppId can't see, and silently falling back was the root cause of
   // Nexus bug 1086633 ("unbound variable `pakModsPath`").
-  private factsFromDiscovery(discovery: IDiscoveryResult): DiscoveryFacts {
+  private async factsFromDiscovery(discovery: IDiscoveryResult): Promise<DiscoveryFacts> {
     const os = process.platform === 'win32' ? 'windows' as const
              : process.platform === 'darwin' ? 'macos' as const
              : 'linux' as const;
@@ -135,6 +135,7 @@ export class GdlRuntime {
       arch: process.arch === 'arm64' ? 'arm64' : 'x64',
       installPath: discovery.path ?? '',
       executablePath: discovery.path ?? '',
+      ...await this.knownFolders(),
     };
     if (os === 'windows') {
       // Mirror the Windows-only AppData paths populated by discover(); kept in
@@ -145,6 +146,24 @@ export class GdlRuntime {
       facts.appDataRoaming  = process.env.APPDATA ?? `${home}/AppData/Roaming`;
     }
     return facts;
+  }
+
+  // Resolve the user Documents + home folders via Vortex. getVortexPath handles
+  // OS differences and Documents redirection (e.g. OneDrive), so we don't derive
+  // them from env. Returns only the keys that resolve, so `${documents}`/`${home}`
+  // are available to templates; absent on environments without getVortexPath.
+  private async knownFolders(): Promise<{ documents?: string; home?: string }> {
+    try {
+      const { util } = await import('vortex-api');
+      const documents = util.getVortexPath('documents');
+      const home = util.getVortexPath('home');
+      return {
+        ...(typeof documents === 'string' && documents !== '' && { documents }),
+        ...(typeof home === 'string' && home !== '' && { home }),
+      };
+    } catch {
+      return {};
+    }
   }
 
   registerGame(
@@ -232,7 +251,7 @@ export class GdlRuntime {
         // setup time; trust it over our cached/store-helper view so manual and
         // sideloaded installs resolve correctly. We still cache for later
         // installer/modtype calls.
-        const facts = this.factsFromDiscovery(discovery);
+        const facts = await this.factsFromDiscovery(discovery);
         this.cachedFacts = facts;
         this.resolvedCtx = resolveContext(contextSpec, facts);
         if (discovery.store) this.discoveredStore = discovery.store;
@@ -556,6 +575,7 @@ export class GdlRuntime {
       ...(appDataLocal    !== undefined && { appDataLocal }),
       ...(appDataLocalLow !== undefined && { appDataLocalLow }),
       ...(appDataRoaming  !== undefined && { appDataRoaming }),
+      ...await this.knownFolders(),
     };
   }
 

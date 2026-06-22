@@ -58,6 +58,8 @@ const buildFacts = (
   appDataRoaming: '/appdata/Roaming',
   appDataLocal: '/appdata/Local',
   appDataLocalLow: '/appdata/LocalLow',
+  documents: '/documents',
+  home: '/home',
 });
 
 interface Scenario {

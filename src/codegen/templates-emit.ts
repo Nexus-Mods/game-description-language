@@ -122,6 +122,8 @@ describe(${sq(doc.game.id + ' — template resolution')}, () => {
         appDataRoaming: '/appdata/Roaming',
         appDataLocal: '/appdata/Local',
         appDataLocalLow: '/appdata/LocalLow',
+        documents: '/documents',
+        home: '/home',
       };
 
       it('context bindings resolve without unbound variables', () => {
