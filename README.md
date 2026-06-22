@@ -81,6 +81,46 @@ game:
   nexusDomain: subnautica2
 ```
 
+### Game discovery
+
+`stores:` is the primary way GDL locates an install: the shim calls
+`GameStoreHelper.findByAppId([...])` with every declared store id. When a game
+can't be found that way, the `discovery:` block adds two fallbacks — a Steam
+lookup by display name and explicit registry probes.
+
+```yaml
+stores:
+  steam: "20900"            # primary lookup + steamAppId metadata
+  gog: "1207659240"         # GOG installs are also probed in the registry (see below)
+
+discovery:
+  # Steam lookup by display name, for games findByAppId can't resolve.
+  steamName: "The Witcher: Enhanced Edition Director's Cut"
+  # Registry probes, tried in declared order. `hive` is HKLM or HKCU; `value`
+  # names the registry value that holds the install path.
+  registry:
+    - { hive: HKLM, key: 'Software\CD Project Red\Witcher', value: 'InstallFolder' }
+```
+
+**Order of operations.** At discovery time the runtime tries each method in turn
+and stops at the first that resolves a path:
+
+1. **Store app-ids** — `GameStoreHelper.findByAppId([...])` over every declared `stores:` id.
+2. **Derived GOG registry key** — if a `gog` store id is declared, the runtime reads
+   `HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\<gogId>\PATH` (and the non-WOW
+   `HKLM\SOFTWARE\GOG.com\Games\<gogId>\PATH` as a fallback). This is automatic: the
+   `<gogId>` is the value already declared under `stores.gog`, so no extra config
+   is needed to cover GOG installs that aren't registered with GOG Galaxy.
+3. **Explicit `registry` probes** — each `discovery.registry` entry, in declared order.
+4. **`steamName`** — `util.steam.findByName(...)`.
+
+Registry reads only do anything on Windows (the underlying `winapi-bindings`
+module is Windows-only); on other platforms they are skipped and discovery falls
+through to the next method. The discovered store is tagged so `store:` branches
+resolve correctly: a derived-GOG hit is tagged `gog`, a `steamName` hit `steam`,
+and an explicit `registry` hit carries no store tag (its `store:` branches fall
+through to the default arm).
+
 ### Context bindings
 
 The `context:` block defines path templates and values that other blocks reference via `${name}`. Branch on the discovered store, OS, or version:
@@ -167,13 +207,21 @@ Restrict an installer to specific stores:
   # ...
 ```
 
-### Discovery hooks
+### Version detection
 
-The `discovery:` block optionally points at a TypeScript hook for version detection:
+The `discovery:` block also reports the installed game version. Use a file+regex
+pair for the common case, or a TypeScript hook for anything more involved:
 
 ```yaml
 discovery:
   version: { hook: detectGameVersion }
+```
+
+```yaml
+discovery:
+  version:
+    file: ${installPath}/build.txt
+    regex: 'Version=([\d.]+)'
 ```
 
 `detectGameVersion` is a function exported by your `src/hooks.ts`:
