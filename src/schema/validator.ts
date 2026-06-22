@@ -483,5 +483,31 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.discovery) {
+    if (doc.discovery.steamName !== undefined && doc.discovery.steamName.trim() === '') {
+      errors.push({
+        code: 'GDL068',
+        message: 'discovery.steamName must not be empty',
+        span: doc.discovery.span,
+      });
+    }
+    for (const probe of doc.discovery.registry ?? []) {
+      if (probe.key.trim() === '') {
+        errors.push({
+          code: 'GDL065',
+          message: 'discovery.registry probe `key` must not be empty',
+          span: probe.span,
+        });
+      }
+      if (probe.value.trim() === '') {
+        errors.push({
+          code: 'GDL066',
+          message: 'discovery.registry probe `value` must not be empty',
+          span: probe.span,
+        });
+      }
+    }
+  }
+
   return errors;
 };

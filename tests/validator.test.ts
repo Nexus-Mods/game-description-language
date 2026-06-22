@@ -483,3 +483,50 @@ installers:
     expect(validate(doc).map(e => e.code)).not.toContain('GDL114');
   });
 });
+
+describe('validate — discovery', () => {
+  const head = `
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+`;
+
+  it('accepts well-formed registry probes and steamName', () => {
+    const doc = tinyDoc(`${head}
+discovery:
+  steamName: "Legend of Grimrock"
+  registry:
+    - { hive: HKLM, key: 'Software\\Foo', value: 'Path' }
+`);
+    expect(validate(doc)).toEqual([]);
+  });
+
+  it('rejects a registry probe with an empty key', () => {
+    const doc = tinyDoc(`${head}
+discovery:
+  registry:
+    - { hive: HKLM, key: '', value: 'Path' }
+`);
+    expect(validate(doc).map(e => e.code)).toContain('GDL065');
+  });
+
+  it('rejects a registry probe with an empty value', () => {
+    const doc = tinyDoc(`${head}
+discovery:
+  registry:
+    - { hive: HKLM, key: 'Software\\Foo', value: '' }
+`);
+    expect(validate(doc).map(e => e.code)).toContain('GDL066');
+  });
+
+  it('rejects an empty steamName', () => {
+    const doc = tinyDoc(`${head}
+discovery:
+  steamName: "  "
+`);
+    expect(validate(doc).map(e => e.code)).toContain('GDL068');
+  });
+});
