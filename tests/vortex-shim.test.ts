@@ -329,3 +329,124 @@ describe('GdlRuntime — derives game.details store ids from stores', () => {
     expect(registeredGame(ctx).details).not.toHaveProperty('manualAppId');
   });
 });
+
+describe('GdlRuntime — discovery fallbacks', () => {
+  const baseDecl = {
+    id: 'grimrock',
+    name: 'Legend of Grimrock',
+    executable: 'grimrock.exe',
+    requiredFiles: ['grimrock.exe'],
+  };
+  const emptyCtxSpec = { bindings: [] } as unknown as ContextSpec;
+  const queryPathOf = (ctx: IExtensionContext) =>
+    (ctx.registerGame as ReturnType<typeof vi.fn>).mock.calls[0]![0].queryPath as () => Promise<string>;
+
+  it('falls back to steam.findByName when findByAppId misses', async () => {
+    const vortex = await import('vortex-api');
+    (vortex.util.GameStoreHelper.findByAppId as ReturnType<typeof vi.fn>).mockReset().mockResolvedValue(null);
+    (vortex.util.steam.findByName as ReturnType<typeof vi.fn>).mockReset().mockResolvedValue({ gamePath: '/games/grimrock' });
+
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      baseDecl,
+      [{ id: 'steam', value: '207170' }],
+      emptyCtxSpec,
+      [],
+      [],
+      { steamName: 'Legend of Grimrock' },
+    );
+    expect(await queryPathOf(ctx)()).toBe('/games/grimrock');
+    expect(vortex.util.steam.findByName).toHaveBeenCalledWith('Legend of Grimrock');
+  });
+
+  it('derives the GOG registry key from a declared gog store id', async () => {
+    const vortex = await import('vortex-api');
+    (vortex.util.GameStoreHelper.findByAppId as ReturnType<typeof vi.fn>).mockReset().mockResolvedValue(null);
+    const winapi = await import('winapi-bindings');
+    (winapi.RegGetValue as ReturnType<typeof vi.fn>).mockReset().mockReturnValue({ value: 'C:/Games/VTMB' });
+
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { ...baseDecl, id: 'vtmb' },
+      [{ id: 'gog', value: '1207659240' }],
+      emptyCtxSpec,
+      [],
+    );
+    expect(await queryPathOf(ctx)()).toBe('C:/Games/VTMB');
+    expect(winapi.RegGetValue).toHaveBeenCalledWith(
+      'HKEY_LOCAL_MACHINE',
+      'SOFTWARE\\WOW6432Node\\GOG.com\\Games\\1207659240',
+      'PATH',
+    );
+  });
+
+  it('falls back to the non-WOW6432Node GOG key when the WOW key misses', async () => {
+    const vortex = await import('vortex-api');
+    (vortex.util.GameStoreHelper.findByAppId as ReturnType<typeof vi.fn>).mockReset().mockResolvedValue(null);
+    const winapi = await import('winapi-bindings');
+    (winapi.RegGetValue as ReturnType<typeof vi.fn>).mockReset()
+      .mockImplementationOnce(() => { throw new Error('missing'); })
+      .mockReturnValueOnce({ value: 'E:/GOG/KOTOR' });
+
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { ...baseDecl, id: 'kotor' },
+      [{ id: 'gog', value: '1207666283' }],
+      emptyCtxSpec,
+      [],
+    );
+    expect(await queryPathOf(ctx)()).toBe('E:/GOG/KOTOR');
+    expect(winapi.RegGetValue).toHaveBeenNthCalledWith(
+      1, 'HKEY_LOCAL_MACHINE', 'SOFTWARE\\WOW6432Node\\GOG.com\\Games\\1207666283', 'PATH',
+    );
+    expect(winapi.RegGetValue).toHaveBeenNthCalledWith(
+      2, 'HKEY_LOCAL_MACHINE', 'SOFTWARE\\GOG.com\\Games\\1207666283', 'PATH',
+    );
+  });
+
+  it('tries explicit registry probes in declared order, stopping at the first hit', async () => {
+    const vortex = await import('vortex-api');
+    (vortex.util.GameStoreHelper.findByAppId as ReturnType<typeof vi.fn>).mockReset().mockResolvedValue(null);
+    const winapi = await import('winapi-bindings');
+    (winapi.RegGetValue as ReturnType<typeof vi.fn>).mockReset()
+      .mockImplementationOnce(() => { throw new Error('value missing'); })
+      .mockReturnValueOnce({ value: 'D:/Witcher' });
+
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { ...baseDecl, id: 'witcher' },
+      [],
+      emptyCtxSpec,
+      [],
+      [],
+      {
+        registry: [
+          { hive: 'HKLM', key: 'Software\\First', value: 'X' },
+          { hive: 'HKCU', key: 'Software\\Second', value: 'Y' },
+        ],
+      },
+    );
+    expect(await queryPathOf(ctx)()).toBe('D:/Witcher');
+    expect(winapi.RegGetValue as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(2);
+    expect(winapi.RegGetValue).toHaveBeenLastCalledWith('HKEY_CURRENT_USER', 'Software\\Second', 'Y');
+  });
+
+  it('still uses the findByAppId result when a store matches (no fallback)', async () => {
+    const vortex = await import('vortex-api');
+    (vortex.util.GameStoreHelper.findByAppId as ReturnType<typeof vi.fn>).mockReset()
+      .mockResolvedValue({ gamePath: '/games/elex', gameStoreId: 'steam' });
+    (vortex.util.steam.findByName as ReturnType<typeof vi.fn>).mockReset();
+
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { ...baseDecl, id: 'elex' },
+      [{ id: 'steam', value: '411300' }],
+      emptyCtxSpec,
+      [],
+      [],
+      { steamName: 'Elex' },
+    );
+    expect(await queryPathOf(ctx)()).toBe('/games/elex');
+    expect(vortex.util.steam.findByName).not.toHaveBeenCalled();
+  });
+});

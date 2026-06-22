@@ -47,5 +47,8 @@ export const buildConfig = (cwd: string): Configuration => ({
     // by Vortex's own Rolldown extension build.
     'vortex-api': 'commonjs2 vortex-api',
     '@nexusmods/vortex-api': 'commonjs2 @nexusmods/vortex-api',
+    // Native registry bindings used by GDL discovery; Vortex's runtime provides
+    // the module (only meaningful on Windows), so leave it external.
+    'winapi-bindings': 'commonjs2 winapi-bindings',
   },
 });

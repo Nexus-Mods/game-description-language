@@ -89,6 +89,23 @@ export interface RequireFilesSpec {
   };
 }
 
+// A registry probe used to locate a game install. `hive` is the HKLM/HKCU
+// shorthand, mapped to winapi's HKEY_* names at read time.
+export interface RegistryProbe {
+  hive: 'HKLM' | 'HKCU';
+  key: string;
+  value: string;
+}
+
+// Discovery configuration emitted alongside the game declaration. Methods are
+// attempted in order: declared store ids -> derived GOG registry key -> explicit
+// `registry` probes (in order) -> `steamName`.
+export interface DiscoverySpec {
+  versionHook?: (ctx: DiscoveryFacts) => Promise<string | null>;
+  steamName?: string;
+  registry?: RegistryProbe[];
+}
+
 export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
   private cachedFacts?: DiscoveryFacts;
@@ -136,7 +153,7 @@ export class GdlRuntime {
     contextSpec: ContextSpec,
     modTypes: ModTypeDecl[],
     installers: InstallerRule[] = [],
-    discovery: { versionHook?: (ctx: DiscoveryFacts) => Promise<string | null> } = {},
+    discovery: DiscoverySpec = {},
     toolbarActions: ToolbarActionDecl[] = [],
     setupDirs: string[] = [],
     eventHooks: EventHooks = {},
@@ -163,7 +180,7 @@ export class GdlRuntime {
         ...decl.details,
       },
       queryPath: async () => {
-        const facts = await this.discover(stores);
+        const facts = await this.discover(stores, discovery);
         if (!facts) return '';
         if (discovery.versionHook) {
           try {
@@ -203,7 +220,7 @@ export class GdlRuntime {
     if (discovery.versionHook) {
       const versionHook = discovery.versionHook;
       game.getGameVersion = async (_gamePath: string) => {
-        const facts = this.cachedFacts ?? await this.discover(stores);
+        const facts = this.cachedFacts ?? await this.discover(stores, discovery);
         if (!facts) return '0.0.0';
         return await versionHook(facts) ?? '0.0.0';
       };
@@ -450,43 +467,113 @@ export class GdlRuntime {
     }
   }
 
-  private async discover(stores: StoreDecl[]): Promise<DiscoveryFacts | null> {
-    const appIds = stores.map(s => String(s.value));
-    if (appIds.length === 0) return null;
+  // Locate the game, trying each discovery method in order:
+  //   1. declared store app-ids via GameStoreHelper
+  //   2. the GOG registry key derived from a declared `gog` store id
+  //   3. explicit `registry` probes, in declared order
+  //   4. `steamName` via util.steam.findByName
+  // The first method that resolves a path wins; later ones are skipped.
+  private async discover(
+    stores: StoreDecl[],
+    opts: { steamName?: string; registry?: RegistryProbe[] } = {},
+  ): Promise<DiscoveryFacts | null> {
     const { util } = await import('vortex-api');
-    try {
-      const found = await util.GameStoreHelper.findByAppId(appIds);
-      if (!found) return null;
-      this.discoveredStore = found.gameStoreId;
-      const os = process.platform === 'win32' ? 'windows' as const
-               : process.platform === 'darwin' ? 'macos' as const
-               : 'linux' as const;
 
-      // Compute platform-specific AppData paths (Windows only for now).
-      let appDataLocal: string | undefined;
-      let appDataLocalLow: string | undefined;
-      let appDataRoaming: string | undefined;
-      if (os === 'windows') {
-        const { homedir } = await import('node:os');
-        const { join, resolve } = await import('node:path');
-        const home = homedir();
-        appDataLocal    = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
-        appDataLocalLow = resolve(appDataLocal, '..', 'LocalLow');
-        appDataRoaming  = process.env.APPDATA || join(home, 'AppData', 'Roaming');
+    // 1. Store app-ids.
+    const appIds = stores.map(s => String(s.value));
+    if (appIds.length > 0) {
+      try {
+        const found = await util.GameStoreHelper.findByAppId(appIds);
+        if (found) return await this.factsFromLocation(found.gamePath, found.gameStoreId);
+      } catch {
+        // Store helper unavailable/threw — fall through to the other methods.
       }
+    }
 
-      return {
-        store: found.gameStoreId,
-        os,
-        arch: process.arch === 'arm64' ? 'arm64' : 'x64',
-        installPath: found.gamePath,
-        executablePath: found.gamePath,   // refined by Vortex later via game.executable()
-        ...(appDataLocal    !== undefined && { appDataLocal }),
-        ...(appDataLocalLow !== undefined && { appDataLocalLow }),
-        ...(appDataRoaming  !== undefined && { appDataRoaming }),
-      };
+    // 2. GOG registry key derived from the declared gog id. GOG records the
+    // install path under SOFTWARE\WOW6432Node\GOG.com\Games\<id>\PATH, and that
+    // <id> is exactly the value declared under `stores.gog`, so no extra config
+    // is needed for the common GOG-without-Galaxy case.
+    const gogId = stores.find(s => s.id === 'gog')?.value;
+    if (gogId !== undefined) {
+      // 64-bit Windows records GOG under the WOW6432Node view; the non-WOW key
+      // is the fallback for installs registered outside it.
+      const gogKeys = [
+        `SOFTWARE\\WOW6432Node\\GOG.com\\Games\\${gogId}`,
+        `SOFTWARE\\GOG.com\\Games\\${gogId}`,
+      ];
+      for (const key of gogKeys) {
+        const path = await this.readRegistryPath('HKLM', key, 'PATH');
+        if (path) return await this.factsFromLocation(path, 'gog');
+      }
+    }
+
+    // 3. Explicit registry probes, in declared order.
+    for (const probe of opts.registry ?? []) {
+      const path = await this.readRegistryPath(probe.hive, probe.key, probe.value);
+      if (path) return await this.factsFromLocation(path, '');
+    }
+
+    // 4. Steam name fallback.
+    if (opts.steamName) {
+      try {
+        const found = await util.steam.findByName(opts.steamName);
+        if (found?.gamePath) return await this.factsFromLocation(found.gamePath, 'steam');
+      } catch {
+        // Not found by name.
+      }
+    }
+
+    return null;
+  }
+
+  // Build DiscoveryFacts from a resolved install path + store id, recording the
+  // discovered store and (on Windows) the AppData roots context bindings use.
+  private async factsFromLocation(gamePath: string, store: string): Promise<DiscoveryFacts> {
+    this.discoveredStore = store;
+    const os = process.platform === 'win32' ? 'windows' as const
+             : process.platform === 'darwin' ? 'macos' as const
+             : 'linux' as const;
+
+    let appDataLocal: string | undefined;
+    let appDataLocalLow: string | undefined;
+    let appDataRoaming: string | undefined;
+    if (os === 'windows') {
+      const { homedir } = await import('node:os');
+      const { join, resolve } = await import('node:path');
+      const home = homedir();
+      appDataLocal    = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
+      appDataLocalLow = resolve(appDataLocal, '..', 'LocalLow');
+      appDataRoaming  = process.env.APPDATA || join(home, 'AppData', 'Roaming');
+    }
+
+    return {
+      store,
+      os,
+      arch: process.arch === 'arm64' ? 'arm64' : 'x64',
+      installPath: gamePath,
+      executablePath: gamePath,   // refined by Vortex later via game.executable()
+      ...(appDataLocal    !== undefined && { appDataLocal }),
+      ...(appDataLocalLow !== undefined && { appDataLocalLow }),
+      ...(appDataRoaming  !== undefined && { appDataRoaming }),
+    };
+  }
+
+  // Read an install path from the Windows registry. Returns undefined on any
+  // failure, including the non-Windows case where winapi-bindings is absent —
+  // so callers can simply try the next discovery method.
+  private async readRegistryPath(
+    hive: 'HKLM' | 'HKCU', key: string, value: string,
+  ): Promise<string | undefined> {
+    const hkey = hive === 'HKLM' ? 'HKEY_LOCAL_MACHINE' : 'HKEY_CURRENT_USER';
+    try {
+      const winapi = await import('winapi-bindings');
+      if (typeof winapi.RegGetValue !== 'function') return undefined;
+      const result = winapi.RegGetValue(hkey, key, value);
+      const path = result?.value;
+      return typeof path === 'string' && path.trim() !== '' ? path : undefined;
     } catch {
-      return null;
+      return undefined;
     }
   }
 }

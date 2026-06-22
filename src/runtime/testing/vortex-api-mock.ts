@@ -29,6 +29,11 @@ export const util = {
       (ids: string | string[]) => Promise<{ gamePath: string; gameStoreId: string } | null>
     >(),
   },
+  // Steam-specific lookups. `findByName` is the discovery fallback used when a
+  // game can't be located by app-id.
+  steam: {
+    findByName: vi.fn<(name: string) => Promise<{ gamePath: string } | null>>(),
+  },
   opn: vi.fn((_url: string) => Promise.resolve()),
   // Lookup helper from Vortex's util — hook authors use this to walk redux
   // state without throwing on missing keys.

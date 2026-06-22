@@ -129,10 +129,23 @@ declare module 'vortex-api' {
     GameStoreHelper: {
       findByAppId(appId: string | string[], storeId?: string): Promise<IFoundGame | null>;
     };
+    steam: {
+      findByName(name: string): Promise<{ gamePath: string } | null>;
+    };
   };
 
   export const selectors: {
     activeGameId: (state: unknown) => string | undefined;
     discoveryByGame: (state: unknown, gameId: string) => { path?: string } | undefined;
   };
+}
+
+// Native Windows registry bindings provided by Vortex at runtime. GDL only uses
+// RegGetValue (for registry-based game discovery); the real module exposes more.
+declare module 'winapi-bindings' {
+  export function RegGetValue(
+    hive: string,
+    key: string,
+    value: string,
+  ): { type?: string; value?: unknown } | undefined;
 }
