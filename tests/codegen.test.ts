@@ -124,6 +124,29 @@ discovery:
     expect(ext.contents).toContain(`import * as hooks from '../src/hooks.js'`);
     expect(ext.contents).toContain(`versionHook: hooks.detectGameVersion`);
   });
+  it('emits steamName and registry probes into the discovery spec', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: helloworld
+  name: Hello World
+  executable: HelloWorld.exe
+  requiredFiles: [HelloWorld.exe]
+stores:
+  steam: "207170"
+discovery:
+  steamName: "Legend of Grimrock"
+  registry:
+    - { hive: HKLM, key: 'GameKey', value: 'InstallFolder' }
+    - { hive: HKCU, key: 'OtherKey', value: 'Path' }
+`, 'disc.yaml');
+    const files = emit(doc);
+    const ext = files.find(f => f.path.endsWith('extension.ts'))!;
+    expect(ext.contents).toContain(`steamName: 'Legend of Grimrock'`);
+    expect(ext.contents).toContain(
+      `registry: [{ hive: 'HKLM', key: 'GameKey', value: 'InstallFolder' }, { hive: 'HKCU', key: 'OtherKey', value: 'Path' }]`,
+    );
+  });
   it('emits inline fileVersion function without hooks import', () => {
     const doc = parseYaml(`
 gdl: 1

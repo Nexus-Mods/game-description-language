@@ -209,6 +209,18 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     ].join('\n');
   }
 
+  // Extra discovery methods threaded into the discovery spec alongside
+  // versionHook. Emitted only when present so existing output is unchanged.
+  const steamNameLine = doc.discovery?.steamName !== undefined
+    ? `\n      steamName: ${sq(doc.discovery.steamName)},`
+    : '';
+  const registryProbes = doc.discovery?.registry ?? [];
+  const registryLine = registryProbes.length > 0
+    ? `\n      registry: [${registryProbes
+        .map(p => `{ hive: ${sq(p.hive)}, key: ${sq(p.key)}, value: ${sq(p.value)} }`)
+        .join(', ')}],`
+    : '';
+
   const stores = (doc.stores?.entries ?? [])
     .map(s => `      { id: ${sq(s.id)}, value: ${sq(s.value)} }`)
     .join(',\n');
@@ -264,7 +276,7 @@ ${modTypes}
     ],
     rules,
     {
-      versionHook: ${versionHook},
+      versionHook: ${versionHook},${steamNameLine}${registryLine}
     },
     [
 ${toolbarActions}
