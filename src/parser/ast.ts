@@ -163,10 +163,29 @@ export interface FileVersionNode extends Node {
 
 export type VersionSourceNode = HookRefNode | FileVersionNode;
 
-// Top-level discovery block
+// A single registry probe used to locate a game install. `hive` is the
+// shorthand HKLM/HKCU (mapped to winapi's HKEY_LOCAL_MACHINE/HKEY_CURRENT_USER
+// at runtime); `value` names the registry value holding the install path.
+export type RegistryHive = 'HKLM' | 'HKCU';
+
+export interface RegistryProbeNode extends Node {
+  kind: 'registryProbe';
+  hive: RegistryHive;
+  key: string;
+  value: string;
+}
+
+// Top-level discovery block. Discovery is attempted in this order at runtime:
+// declared store ids -> derived GOG registry key (for a declared `gog` store)
+// -> explicit `registry` probes (in declared order) -> `steamName`.
 export interface DiscoveryNode extends Node {
   kind: 'discovery';
   version?: VersionSourceNode;
+  // Fallback Steam lookup by display name (util.steam.findByName) for games
+  // that don't resolve via findByAppId.
+  steamName?: string;
+  // Extra registry probes, tried in declared order if store discovery misses.
+  registry?: RegistryProbeNode[];
 }
 
 // Test harness types

@@ -487,6 +487,56 @@ discovery:
 `, 'inline.yaml')).toThrow();
   });
 
+  it('parses discovery.steamName', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+stores:
+  steam: "207170"
+discovery:
+  steamName: "Legend of Grimrock"
+`, 'inline.yaml');
+    expect(doc.discovery?.steamName).toBe('Legend of Grimrock');
+  });
+
+  it('parses discovery.registry probes in declared order', () => {
+    const doc = parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+discovery:
+  registry:
+    - { hive: HKLM, key: 'Software\\CD Project Red\\Witcher', value: 'InstallFolder' }
+    - { hive: HKCU, key: 'Software\\Foo', value: 'Path' }
+`, 'inline.yaml');
+    expect(doc.discovery?.registry).toHaveLength(2);
+    expect(doc.discovery?.registry?.[0]).toMatchObject({
+      hive: 'HKLM', key: 'Software\\CD Project Red\\Witcher', value: 'InstallFolder',
+    });
+    expect(doc.discovery?.registry?.[1]).toMatchObject({ hive: 'HKCU', key: 'Software\\Foo', value: 'Path' });
+  });
+
+  it('rejects discovery.registry with an unknown hive', () => {
+    expect(() => parseYaml(`
+gdl: 1
+game:
+  id: x
+  name: X
+  executable: X.exe
+  requiredFiles: [X.exe]
+discovery:
+  registry:
+    - { hive: HKEY_LOCAL_MACHINE, key: 'Software\\Foo', value: 'Path' }
+`, 'inline.yaml')).toThrow();
+  });
+
   it('parses object-form { hook: name } in events.did-deploy', () => {
     const doc = parseYaml(`
 gdl: 1

@@ -3,7 +3,7 @@ import type {
   DocumentNode, GameNode, StoresNode, StoreId, ContextNode, ValueNode, ModTypeNode,
   InstallerNode, InstallerScope, SingleInstallerForm, RouteEntry, CopyInstallerForm, TakeStrategy,
   PatternNode, PredicateNode, ComparisonExpr, ValueRef, DiscoveryNode, HookRefNode,
-  FileVersionNode, VersionSourceNode,
+  FileVersionNode, VersionSourceNode, RegistryProbeNode, RegistryHive,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode,
   ValidatorNode, ValidatorAssertNode, PlacementAssertNode,
   NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode, DiagnosticNode,
@@ -101,6 +101,47 @@ const parseVersionSource = (node: YamlNode | null | undefined, file: string, sou
     message: 'discovery.version must be { hook: <id> } or { file: <path>, regex: <pattern> }',
     span: spanOf(file, source, node ?? null),
   }]);
+};
+
+const REGISTRY_HIVES = new Set<RegistryHive>(['HKLM', 'HKCU']);
+
+const parseRegistryProbes = (node: YamlNode, file: string, source: string): RegistryProbeNode[] => {
+  if (!isSeq(node)) {
+    throw new BuildErrors([{
+      code: 'GDL069',
+      message: 'discovery.registry must be a list of { hive, key, value } probes',
+      span: spanOf(file, source, node),
+    }]);
+  }
+  const probes: RegistryProbeNode[] = [];
+  for (const item of node.items) {
+    const span = spanOf(file, source, item as YamlNode);
+    if (!isMap(item)) {
+      throw new BuildErrors([{
+        code: 'GDL069',
+        message: 'discovery.registry entry must be a { hive, key, value } object',
+        span,
+      }]);
+    }
+    const hive = item.get('hive');
+    const key = item.get('key');
+    const value = item.get('value');
+    if (typeof hive !== 'string' || !REGISTRY_HIVES.has(hive as RegistryHive)) {
+      throw new BuildErrors([{
+        code: 'GDL070',
+        message: `discovery.registry hive \`${String(hive)}\` must be one of: ${[...REGISTRY_HIVES].join(', ')}`,
+        span,
+      }]);
+    }
+    probes.push({
+      kind: 'registryProbe',
+      hive: hive as RegistryHive,
+      key: typeof key === 'string' ? key : '',
+      value: typeof value === 'string' ? value : '',
+      span,
+    });
+  }
+  return probes;
 };
 
 const parseBranchArms = (
@@ -898,12 +939,22 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
   let discovery: DiscoveryNode | undefined;
   if (isMap(discoveryYaml)) {
     const versionYaml = discoveryYaml.get('version', true);
-    if (versionYaml) {
-      const version = parseVersionSource(versionYaml as YamlNode, file, source);
-      discovery = { kind: 'discovery', version, span: spanOf(file, source, discoveryYaml) };
-    } else {
-      discovery = { kind: 'discovery', span: spanOf(file, source, discoveryYaml) };
-    }
+    const version = versionYaml
+      ? parseVersionSource(versionYaml as YamlNode, file, source)
+      : undefined;
+    const steamNameVal = discoveryYaml.get('steamName');
+    const steamName = typeof steamNameVal === 'string' ? steamNameVal : undefined;
+    const registryYaml = discoveryYaml.get('registry', true);
+    const registry = registryYaml
+      ? parseRegistryProbes(registryYaml as YamlNode, file, source)
+      : undefined;
+    discovery = {
+      kind: 'discovery',
+      ...(version !== undefined && { version }),
+      ...(steamName !== undefined && { steamName }),
+      ...(registry !== undefined && { registry }),
+      span: spanOf(file, source, discoveryYaml),
+    };
   }
 
   const testsYaml = root.get('tests', true);
