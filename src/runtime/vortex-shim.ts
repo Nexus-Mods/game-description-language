@@ -84,11 +84,63 @@ export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
   private cachedFacts?: DiscoveryFacts;
   private discoveredStore: string | undefined;
+  // Captured at registerGame time so installer/modtype callbacks can lazily
+  // resolve context from Vortex's live discovery — even when the game has no
+  // `setup:` block (setup() is the only place that eagerly populates
+  // resolvedCtx). See ensureResolvedCtx().
+  private contextSpec?: ContextSpec;
+  private gameId?: string;
+  // Overridable Vortex live-discovery lookup; see liveDiscovery().
+  private liveDiscoveryFn?: (gameId: string) => IDiscoveryResult | undefined;
 
   constructor(private readonly api: IExtensionContext) {}
 
   setDiscoveredStore(store: string | undefined): void {
     this.discoveredStore = store;
+  }
+
+  // Read Vortex's own discovery for a game. This is the authoritative source
+  // (covers manual/sideloaded installs) and feeds ensureResolvedCtx() and the
+  // modType getPath. Overridable via setLiveDiscoveryForTesting() so tests can
+  // drive it without the CJS `require('vortex-api')` that vitest's ESM alias
+  // doesn't intercept.
+  private liveDiscovery(gameId: string): IDiscoveryResult | undefined {
+    if (this.liveDiscoveryFn) return this.liveDiscoveryFn(gameId);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { selectors } = require('vortex-api') as typeof import('vortex-api');
+      return selectors.discoveryByGame(this.api.api.getState(), gameId);
+    } catch {
+      // vortex-api not resolvable (unit tests without the seam set). Callers
+      // treat undefined as "not discovered yet".
+      return undefined;
+    }
+  }
+
+  // Return a resolved context for installer/modtype use. Prefer the context
+  // eagerly built by setup()/queryPath(); if neither has run yet, resolve it
+  // from Vortex's own discovery — the authoritative source that also covers
+  // manual/sideloaded installs. Without this, a game with no `setup:` block
+  // whose installers reference a custom `context:` binding (e.g. `${runtimeRoot}`)
+  // threw "unbound variable" at install time because resolvedCtx was never
+  // populated (the 007firstlight report).
+  private ensureResolvedCtx(): ResolvedContext {
+    if (this.resolvedCtx) return this.resolvedCtx;
+    if (!this.contextSpec || !this.gameId) return {};
+    try {
+      const discovery = this.liveDiscovery(this.gameId);
+      if (!discovery?.path) return {};
+      const facts = this.factsFromDiscovery(discovery);
+      this.cachedFacts = facts;
+      if (discovery.store) this.discoveredStore = discovery.store;
+      this.resolvedCtx = resolveContext(this.contextSpec, facts);
+      return this.resolvedCtx;
+    } catch {
+      // Discovery not ready / resolution failed — fall back to whatever we
+      // have. Installer interpolate() may still throw, but that is the
+      // pre-existing behavior for a genuinely-undiscovered game.
+      return this.resolvedCtx ?? {};
+    }
   }
 
   // Build DiscoveryFacts from a Vortex IDiscoveryResult.
@@ -133,6 +185,10 @@ export class GdlRuntime {
     eventHooks: EventHooks = {},
     diagnostics: IModHealthCheck[] = [],
   ) {
+    // Captured for ensureResolvedCtx(), which lazily rebuilds the context from
+    // live discovery when setup()/queryPath() haven't populated it.
+    this.contextSpec = contextSpec;
+    this.gameId = decl.id;
     // Mirror Vortex's environment.SteamAPPId auto-derivation: queryArgs.steam
     // would set it so the launched game sees the right app id. GDL discovers via
     // GameStoreHelper, so derive it from the declared steam store. The matching
@@ -223,11 +279,9 @@ export class GdlRuntime {
         50,
         (gameId) => gameId === decl.id,
         () => {
-          const { selectors } = require('vortex-api') as typeof import('vortex-api');
-          const state = this.api.api.getState();
-          const discovery = selectors.discoveryByGame(state, decl.id);
+          const discovery = this.liveDiscovery(decl.id);
           const ctx = {
-            ...this.resolvedCtx ?? {},
+            ...this.ensureResolvedCtx(),
             ...(discovery?.path !== undefined && { installPath: discovery.path }),
           };
           return this.resolveModTypePath(mt, ctx as ResolvedContext);
@@ -269,16 +323,26 @@ export class GdlRuntime {
   private registerInstallerRule(gameId: string, rule: InstallerRule): void {
     const testSupported: TestSupportedFn = async (files, gid) => {
       if (gid !== gameId) return { supported: false };
+      // Resolve context first: ensureResolvedCtx() also populates
+      // discoveredStore from Vortex's live discovery, which the scope check
+      // below depends on. A setup-less game whose store is known only via live
+      // discovery would otherwise fail the scope gate before it was populated.
+      const vars = this.ensureResolvedCtx();
       if (rule.scope?.stores && rule.scope.stores.length > 0) {
         if (!this.discoveredStore || !rule.scope.stores.includes(this.discoveredStore)) {
           return { supported: false };
         }
       }
       const normalisedFiles = files.map(normaliseArchivePath);
-      const ctx = {
-        archivePaths: normalisedFiles,
-        vars: this.resolvedCtx ?? {},
-      };
+      const ctx = { archivePaths: normalisedFiles, vars };
+      // A rule whose `placeAt` references a context var we can't resolve (e.g.
+      // the game is genuinely undiscovered, so there is no installPath) must not
+      // claim support — otherwise install() throws an unbound-variable error
+      // into Vortex. Building the plan here surfaces that as "unsupported".
+      // (installHook rules don't build a declarative plan, so they're exempt.)
+      if (!rule.installHook && !this.rulePlanIsResolvable(rule, normalisedFiles, ctx)) {
+        return { supported: false };
+      }
       // Honor `unless` here too: otherwise a higher-priority rule whose `when`
       // matches but whose `unless` excludes the archive would claim support and
       // then build an empty plan, which Vortex reports as a canceled install.
@@ -300,7 +364,7 @@ export class GdlRuntime {
       const normalisedFiles = files.map(normaliseArchivePath);
       const ctx = {
         archivePaths: normalisedFiles,
-        vars: this.resolvedCtx ?? {},
+        vars: this.ensureResolvedCtx(),
       };
       const rawByNormalised = new Map(files.map(file => [normaliseArchivePath(file), file]));
       const plan = buildInstallPlan(rule, normalisedFiles, ctx);
@@ -324,6 +388,26 @@ export class GdlRuntime {
     this.api.registerInstaller(rule.id, rule.priority, testSupported, install);
   }
 
+  // Whether a rule can actually build a plan for these files with the current
+  // context — i.e. its `placeAt` templates resolve. Returns false (rather than
+  // letting the error escape) when a referenced context var is unbound, which
+  // happens for a genuinely-undiscovered game (no installPath). Used by
+  // testSupported so such a rule declines support instead of crashing Vortex
+  // from install().
+  private rulePlanIsResolvable(
+    rule: InstallerRule,
+    normalisedFiles: string[],
+    ctx: { archivePaths: string[]; vars: ResolvedContext },
+  ): boolean {
+    if (!ruleSupports(rule, ctx)) return true; // rule won't match; nothing to resolve
+    try {
+      buildInstallPlan(rule, normalisedFiles, ctx);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // Test-only seam.
   registerInstallerRulePublic(gameId: string, rule: InstallerRule): void {
     this.registerInstallerRule(gameId, rule);
@@ -332,6 +416,13 @@ export class GdlRuntime {
   // Test-only seam.
   setResolvedCtxForTesting(ctx: Record<string, string>): void {
     this.resolvedCtx = ctx;
+  }
+
+  // Test-only seam: inject Vortex's live discovery lookup so lifecycle tests can
+  // exercise ensureResolvedCtx()/modType getPath without the CJS
+  // `require('vortex-api')` that vitest's ESM alias doesn't intercept.
+  setLiveDiscoveryForTesting(fn: (gameId: string) => IDiscoveryResult | undefined): void {
+    this.liveDiscoveryFn = fn;
   }
 
   // Test-only seam: register a single mod type with a plain string template.
