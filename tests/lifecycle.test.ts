@@ -18,6 +18,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GdlRuntime } from '../src/runtime/index.js';
 import { createFakeContext, type FakeContextHandle, type FakeIGame } from '../src/runtime/testing/index.js';
 import type { ContextSpec } from '../src/runtime/context-resolver.js';
+import type { InstallerRule } from '../src/runtime/installer-engine.js';
 import type { IExtensionContext } from 'vortex-api';
 
 // Minimal but realistic spec: covers literal, interpolated, and storeBranch
@@ -143,6 +144,95 @@ describe('GdlRuntime: setup(discovery)', () => {
 
     const calls = vi.mocked(fs.ensureDirWritableAsync).mock.calls.map(c => c[0]);
     expect(calls).toContain('/installs/FakeGame/Game/Binaries/WinGDK');
+  });
+});
+
+describe('GdlRuntime: installer context without a setup block', () => {
+  // Repro of the 007firstlight report ("unbound variable `runtimeRoot`"): a
+  // game that declares a custom context binding (`runtimeRoot`) referenced from
+  // an installer's `placeAt`, but has NO `setup:` block. Without setup(),
+  // `resolvedCtx` was never populated, so the installer's interpolate() of
+  // `${runtimeRoot}` threw at install time. The installer must resolve context
+  // from Vortex's live discovery, independent of whether setup() ran.
+  const RPKG_RULE: InstallerRule = {
+    id: 'rpkg-patch',
+    priority: 50,
+    when: { kind: 'hasFile', glob: '**/*.rpkg' },
+    single: {
+      anchor: { kind: 'glob', pattern: '**/*.rpkg' },
+      take: 'parent',
+      placeAt: '${runtimeRoot}',
+    },
+    modType: 'rpkg-patch',
+  };
+  const CTX_SPEC: ContextSpec = {
+    bindings: [
+      { name: 'runtimeRoot', value: { kind: 'interpolated', template: '${installPath}/Runtime' } },
+    ],
+  };
+  const DECL = {
+    id: 'gamewithoutsetup',
+    name: 'Game Without Setup',
+    executable: 'Game.exe',
+    requiredFiles: ['Game.exe'],
+  };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('resolves ${runtimeRoot} from live discovery when setup() never ran', async () => {
+    const { h, runtime } = buildRuntime();
+    // No setupDirs -> setup() is never registered, mirroring 007firstlight.
+    runtime.registerGame(DECL, [{ id: 'steam', value: '3768760' }], CTX_SPEC, [], [RPKG_RULE]);
+
+    // Vortex has discovered the game via its own discovery (not GameStoreHelper).
+    runtime.setLiveDiscoveryForTesting(() => ({ path: '/installs/Game', store: 'steam' }));
+
+    const files = ['MyMod/chunk0patch1.rpkg'];
+    const { matchedId, result } = await h.runInstaller(files, 'gamewithoutsetup');
+    expect(matchedId).toBe('rpkg-patch');
+    // Reaching a built plan (not an unbound-variable throw) is the assertion.
+    expect(result!.instructions).toContainEqual(
+      { type: 'copy', source: 'MyMod/chunk0patch1.rpkg', destination: 'chunk0patch1.rpkg' },
+    );
+    expect(result!.instructions).toContainEqual({ type: 'setmodtype', value: 'rpkg-patch' });
+  });
+
+  it('does not crash when the game is genuinely undiscovered', async () => {
+    // If Vortex has no discovery for the game, there is no installPath to build
+    // ${runtimeRoot} from. The installer must not claim support it can't honor:
+    // testSupported returns false so Vortex routes the archive elsewhere rather
+    // than the install fn throwing an unbound-variable error into Vortex.
+    const { h, runtime } = buildRuntime();
+    runtime.registerGame(DECL, [{ id: 'steam', value: '3768760' }], CTX_SPEC, [], [RPKG_RULE]);
+
+    // Live discovery returns nothing (undiscovered / not yet discovered).
+    runtime.setLiveDiscoveryForTesting(() => undefined);
+
+    const files = ['MyMod/chunk0patch1.rpkg'];
+    await expect(h.runInstaller(files, 'gamewithoutsetup')).resolves.not.toThrow();
+    const { matchedId } = await h.runInstaller(files, 'gamewithoutsetup');
+    expect(matchedId).toBeUndefined();
+  });
+
+  it('applies a store-scoped installer using the store from live discovery', async () => {
+    // A scoped installer (scope.stores) must match when the discovered store is
+    // known only via live discovery — not just when setup()/queryPath already
+    // populated discoveredStore. Otherwise a setup-less game silently drops
+    // store-scoped installers.
+    const scopedRule: InstallerRule = {
+      ...RPKG_RULE,
+      id: 'rpkg-steam-only',
+      scope: { stores: ['steam'] },
+    };
+    const { h, runtime } = buildRuntime();
+    runtime.registerGame(DECL, [{ id: 'steam', value: '3768760' }], CTX_SPEC, [], [scopedRule]);
+
+    // Store is known ONLY through live discovery (no setup(), no setDiscoveredStore).
+    runtime.setLiveDiscoveryForTesting(() => ({ path: '/installs/Game', store: 'steam' }));
+
+    const files = ['MyMod/chunk0patch1.rpkg'];
+    const { matchedId } = await h.runInstaller(files, 'gamewithoutsetup');
+    expect(matchedId).toBe('rpkg-steam-only');
   });
 });
 
