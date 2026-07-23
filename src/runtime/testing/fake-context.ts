@@ -24,7 +24,15 @@ export interface FakeIGame {
   executable: () => string;
   queryPath?: () => Promise<unknown>;
   queryModPath?: (gamePath: string) => string;
-  setup?: (discovery: { path?: string; store?: string }) => Promise<void>;
+  setup?: (discovery: {
+    path?: string;
+    store?: string;
+    // Test-only appData sentinels the generated lifecycle suite injects so
+    // setup-dir assertions are deterministic; ignored by real Vortex.
+    appDataLocal?: string;
+    appDataLocalLow?: string;
+    appDataRoaming?: string;
+  }) => Promise<void>;
   getGameVersion?: (gamePath: string, exePath?: string) => Promise<string>;
   // ... other IGame fields we don't read here are ignored
 }

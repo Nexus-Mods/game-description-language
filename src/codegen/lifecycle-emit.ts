@@ -15,7 +15,7 @@
 
 import type { DocumentNode, ValueNode } from '../parser/ast.js';
 import type { ContextSpec, DiscoveryFacts, ResolvableValue } from '../runtime/context-resolver.js';
-import { resolveContext } from '../runtime/context-resolver.js';
+import { resolveContext, windowsAppDataFacts } from '../runtime/context-resolver.js';
 import { interpolate } from '../runtime/interpolate.js';
 import { sq } from './emit.js';
 
@@ -41,6 +41,19 @@ const buildSpec = (doc: DocumentNode): ContextSpec => ({
   })),
 });
 
+// Deterministic AppData sentinels for the generated test. Derived through the
+// SAME helper the runtime uses (windowsAppDataFacts) from a fixed fake env, so
+// the expected values computed here at codegen time exactly equal what the
+// runtime's factsFromDiscovery produces when the emitted setup() call injects
+// these same sentinels onto the discovery object. Using the helper (not raw
+// literals) means any change to the LocalLow-derivation formula updates both
+// sides together, keeping the literal pin honest. `/fake/AppData/Local` →
+// appDataLocalLow `/fake/AppData/LocalLow`.
+export const TEST_APPDATA = windowsAppDataFacts({
+  LOCALAPPDATA: '/fake/AppData/Local',
+  APPDATA: '/fake/AppData/Roaming',
+});
+
 const buildFacts = (
   gameId: string,
   executable: string,
@@ -55,9 +68,9 @@ const buildFacts = (
   // Optional discovery facts Vortex supplies at runtime — provided so games that
   // deploy to user-data roots (LocalLow/Roaming) resolve their setup dirs and
   // queryModPath instead of throwing an unbound-variable error at codegen.
-  appDataRoaming: '/appdata/Roaming',
-  appDataLocal: '/appdata/Local',
-  appDataLocalLow: '/appdata/LocalLow',
+  appDataRoaming: TEST_APPDATA.appDataRoaming,
+  appDataLocal: TEST_APPDATA.appDataLocal,
+  appDataLocalLow: TEST_APPDATA.appDataLocalLow,
 });
 
 interface Scenario {
@@ -122,7 +135,7 @@ describe.skip(${sq(doc.game.id + ' — lifecycle (no assertions)')}, () => {});
       main(h.context as never);
       const g = h.registered.game;
       if (!g?.setup) throw new Error('extension did not register a setup function');
-      await g.setup({ path: ${sq(s.installPath)}, store: ${sq(s.store)} });
+      await g.setup({ path: ${sq(s.installPath)}, store: ${sq(s.store)}, appDataLocal: ${sq(TEST_APPDATA.appDataLocal)}, appDataLocalLow: ${sq(TEST_APPDATA.appDataLocalLow)}, appDataRoaming: ${sq(TEST_APPDATA.appDataRoaming)} });
       const calls = vi.mocked(fs.ensureDirWritableAsync).mock.calls.map(c => c[0]);
 ${s.expectedSetupDirs.map(d => `      expect(calls).toContain(${sq(d)});`).join('\n')}
     });` : ''}
@@ -132,7 +145,7 @@ ${s.expectedSetupDirs.map(d => `      expect(calls).toContain(${sq(d)});`).join(
       main(h.context as never);
       const g = h.registered.game;
       if (!g?.setup || !g?.queryModPath) throw new Error('extension is missing setup or queryModPath');
-      await g.setup({ path: ${sq(s.installPath)}, store: ${sq(s.store)} });
+      await g.setup({ path: ${sq(s.installPath)}, store: ${sq(s.store)}, appDataLocal: ${sq(TEST_APPDATA.appDataLocal)}, appDataLocalLow: ${sq(TEST_APPDATA.appDataLocalLow)}, appDataRoaming: ${sq(TEST_APPDATA.appDataRoaming)} });
       expect(g.queryModPath(${sq(s.installPath)})).toBe(${sq(s.expectedQueryModPath)});
     });` : ''}
   });`).join('\n');
