@@ -1,12 +1,18 @@
 import type { IExtensionContext, IGame, TestSupportedFn, InstallFn, ActionVisibilityFn, ActionRunFn, IModHealthCheck } from 'vortex-api';
 import type { DiscoveryFacts, ResolvedContext, ResolvableValue } from './context-resolver.js';
-import { resolveContext, type ContextSpec } from './context-resolver.js';
+import { resolveContext, windowsAppDataFacts, type ContextSpec } from './context-resolver.js';
 
 // Vortex's IDiscoveryResult isn't re-exported from the package, but its shape
-// is stable. We only consume the two fields we need.
+// is stable. We only consume the two fields we need. The appData* fields are
+// NOT part of the real Vortex result — they exist only so the test harness can
+// inject deterministic sentinels; in production these are always undefined and
+// factsFromDiscovery derives them from the environment.
 interface IDiscoveryResult {
   path?: string;
   store?: string;
+  appDataLocal?: string;
+  appDataLocalLow?: string;
+  appDataRoaming?: string;
 }
 import { interpolate } from './interpolate.js';
 import { resolveBranch } from './branch-tags.js';
@@ -163,12 +169,15 @@ export class GdlRuntime {
       executablePath: discovery.path ?? '',
     };
     if (os === 'windows') {
-      // Mirror the Windows-only AppData paths populated by discover(); kept in
-      // sync there so both code paths produce the same facts shape.
-      const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
-      facts.appDataLocal    = process.env.LOCALAPPDATA ?? `${home}/AppData/Local`;
-      facts.appDataLocalLow = `${facts.appDataLocal}/../LocalLow`;
-      facts.appDataRoaming  = process.env.APPDATA ?? `${home}/AppData/Roaming`;
+      // AppData roots aren't in a real Vortex IDiscoveryResult, so derive them
+      // from the environment via the shared helper (single source of truth with
+      // discover() and the codegen test harness). A test may inject sentinels on
+      // the discovery object to make generated assertions deterministic; honor
+      // those over the environment when present.
+      const env = windowsAppDataFacts();
+      facts.appDataLocal    = discovery.appDataLocal    ?? env.appDataLocal;
+      facts.appDataLocalLow = discovery.appDataLocalLow ?? env.appDataLocalLow;
+      facts.appDataRoaming  = discovery.appDataRoaming  ?? env.appDataRoaming;
     }
     return facts;
   }
@@ -513,17 +522,20 @@ export class GdlRuntime {
                : process.platform === 'darwin' ? 'macos' as const
                : 'linux' as const;
 
-      // Compute platform-specific AppData paths (Windows only for now).
+      // Compute platform-specific AppData paths (Windows only for now) via the
+      // shared helper — single source of truth with factsFromDiscovery and the
+      // codegen test harness. homedir() is the fallback when %LOCALAPPDATA%/
+      // %APPDATA% are unset, matching this path's historical behavior.
       let appDataLocal: string | undefined;
       let appDataLocalLow: string | undefined;
       let appDataRoaming: string | undefined;
       if (os === 'windows') {
         const { homedir } = await import('node:os');
-        const { join, resolve } = await import('node:path');
-        const home = homedir();
-        appDataLocal    = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
-        appDataLocalLow = resolve(appDataLocal, '..', 'LocalLow');
-        appDataRoaming  = process.env.APPDATA || join(home, 'AppData', 'Roaming');
+        ({ appDataLocal, appDataLocalLow, appDataRoaming } = windowsAppDataFacts({
+          LOCALAPPDATA: process.env.LOCALAPPDATA,
+          APPDATA: process.env.APPDATA,
+          USERPROFILE: homedir(),
+        }));
       }
 
       return {

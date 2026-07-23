@@ -24,6 +24,38 @@ export interface DiscoveryFacts {
 
 export type ResolvedContext = Record<string, string | number | boolean>;
 
+// The Windows AppData roots Vortex never puts in its IDiscoveryResult, derived
+// from the environment. Three call sites used to compute these inline with
+// subtly different formulas — factsFromDiscovery left a literal '/../LocalLow'
+// in the path, discover() normalised it away, and the codegen test harness
+// hardcoded a third sentinel — so a setup dir under ${appDataLocalLow} resolved
+// to a different string in each, and the generated lifecycle test could never
+// match the runtime (Paralives, 2026-07). This is the single source of truth.
+//
+// Paths use forward slashes and no unresolved '..' segment so that string
+// assertions in generated tests are stable. `env` is injectable so codegen and
+// tests can force deterministic sentinels instead of the host's real env.
+export interface WindowsAppDataEnv {
+  LOCALAPPDATA?: string | undefined;
+  APPDATA?: string | undefined;
+  USERPROFILE?: string | undefined;
+  HOME?: string | undefined;
+}
+
+export const windowsAppDataFacts = (
+  env: WindowsAppDataEnv = process.env,
+): { appDataLocal: string; appDataLocalLow: string; appDataRoaming: string } => {
+  const home = env.USERPROFILE ?? env.HOME ?? '';
+  const appDataLocal = (env.LOCALAPPDATA || `${home}/AppData/Local`).replace(/\\/g, '/');
+  const appDataRoaming = (env.APPDATA || `${home}/AppData/Roaming`).replace(/\\/g, '/');
+  // LocalLow is Local's sibling. Replace the final path segment with 'LocalLow'
+  // rather than appending '/../LocalLow', so the result carries no '..' segment
+  // to normalise and string assertions in generated tests stay stable. Works
+  // regardless of what the final segment is named on a customised %LOCALAPPDATA%.
+  const appDataLocalLow = appDataLocal.replace(/\/[^/]*$/, '/LocalLow');
+  return { appDataLocal, appDataLocalLow, appDataRoaming };
+};
+
 const resolveValue = (
   value: ResolvableValue,
   ctx: ResolvedContext,
