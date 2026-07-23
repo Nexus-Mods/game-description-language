@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { GdlRuntime } from '../src/runtime/vortex-shim.js';
 import type { ContextSpec } from '../src/runtime/context-resolver.js';
 import type { IExtensionContext } from 'vortex-api';
+import { fs } from 'vortex-api';
 
 const makeCtx = () => ({
   registerGame: vi.fn(),
@@ -327,5 +328,64 @@ describe('GdlRuntime — derives game.details store ids from stores', () => {
       [],
     );
     expect(registeredGame(ctx).details).not.toHaveProperty('manualAppId');
+  });
+});
+
+// Regression: the CI runner is Linux, but games like Paralives target Windows
+// and deploy to ${appDataLocalLow}. factsFromDiscovery used to gate the ENTIRE
+// appData population behind `process.platform === 'win32'`, so on Linux the
+// appData vars injected on the discovery object were discarded and setup()
+// threw "unbound variable `appDataLocalLow`" — passing on a Windows dev machine
+// but failing on CI. The fix: honor discovery-supplied appData on ANY host;
+// only the env-derivation FALLBACK stays Windows-gated.
+describe('GdlRuntime — setup() honors injected appData regardless of host OS', () => {
+  const realPlatform = process.platform;
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: realPlatform, configurable: true });
+    vi.clearAllMocks();
+  });
+
+  const runSetupOnPlatform = async (platform: string) => {
+    Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+    const registerGame = vi.fn();
+    const ctx = {
+      registerGame,
+      registerModType: vi.fn(),
+      registerInstaller: vi.fn(),
+      registerAction: vi.fn(),
+      api: { getState: () => ({}), events: { on: vi.fn() } },
+    } as unknown as IExtensionContext;
+
+    new GdlRuntime(ctx).registerGame(
+      { id: 'paraish', name: 'Paraish', executable: 'p.exe', requiredFiles: ['p.exe'] },
+      [{ id: 'steam', value: '111' }],
+      { bindings: [{ name: 'localModsPath', value: { kind: 'interpolated', template: '${appDataLocalLow}/Paraish' } }] },
+      [],
+      [],
+      {},
+      [],
+      ['${localModsPath}'], // setup.ensureDirs
+    );
+
+    const game = registerGame.mock.calls[0]![0] as { setup: (d: unknown) => Promise<void> };
+    await game.setup({
+      path: '/games/paraish',
+      store: 'steam',
+      // Sentinels the codegen lifecycle harness injects; must be honored on Linux too.
+      appDataLocal: '/fake/AppData/Local',
+      appDataLocalLow: '/fake/AppData/LocalLow',
+      appDataRoaming: '/fake/AppData/Roaming',
+    });
+    return vi.mocked(fs.ensureDirWritableAsync).mock.calls.map(c => c[0]);
+  };
+
+  it('resolves ${appDataLocalLow} from the injected sentinel on a Linux host (CI)', async () => {
+    const calls = await runSetupOnPlatform('linux');
+    expect(calls).toContain('/fake/AppData/LocalLow/Paraish');
+  });
+
+  it('resolves the same on a Windows host', async () => {
+    const calls = await runSetupOnPlatform('win32');
+    expect(calls).toContain('/fake/AppData/LocalLow/Paraish');
   });
 });
