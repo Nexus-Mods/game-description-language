@@ -168,17 +168,29 @@ export class GdlRuntime {
       installPath: discovery.path ?? '',
       executablePath: discovery.path ?? '',
     };
-    if (os === 'windows') {
-      // AppData roots aren't in a real Vortex IDiscoveryResult, so derive them
-      // from the environment via the shared helper (single source of truth with
-      // discover() and the codegen test harness). A test may inject sentinels on
-      // the discovery object to make generated assertions deterministic; honor
-      // those over the environment when present.
-      const env = windowsAppDataFacts();
-      facts.appDataLocal    = discovery.appDataLocal    ?? env.appDataLocal;
-      facts.appDataLocalLow = discovery.appDataLocalLow ?? env.appDataLocalLow;
-      facts.appDataRoaming  = discovery.appDataRoaming  ?? env.appDataRoaming;
-    }
+    // AppData roots aren't in a real Vortex IDiscoveryResult. A caller (in
+    // practice the codegen lifecycle test) may inject them on the discovery
+    // object to make assertions deterministic — honor those on ANY host OS, so
+    // a Windows-targeting game's test still resolves ${appDataLocalLow} when the
+    // suite runs on the Linux CI runner. Only the ENV-derivation fallback is
+    // Windows-gated, since deriving %LOCALAPPDATA% from a non-Windows env is
+    // meaningless (on Linux/macOS a real Vortex discovery supplies no appData
+    // and no game references these vars).
+    // AppData roots aren't in a real Vortex IDiscoveryResult. A caller (in
+    // practice the codegen lifecycle test) may inject them on the discovery
+    // object to make assertions deterministic — honor those on ANY host OS, so
+    // a Windows-targeting game's test still resolves ${appDataLocalLow} when the
+    // suite runs on the Linux CI runner. Only the ENV-derivation fallback is
+    // Windows-gated, since deriving %LOCALAPPDATA% from a non-Windows env is
+    // meaningless (on Linux/macOS a real Vortex discovery supplies no appData
+    // and no game references these vars).
+    const env = os === 'windows' ? windowsAppDataFacts() : undefined;
+    const appDataLocal    = discovery.appDataLocal    ?? env?.appDataLocal;
+    const appDataLocalLow = discovery.appDataLocalLow ?? env?.appDataLocalLow;
+    const appDataRoaming  = discovery.appDataRoaming  ?? env?.appDataRoaming;
+    if (appDataLocal    !== undefined) facts.appDataLocal    = appDataLocal;
+    if (appDataLocalLow !== undefined) facts.appDataLocalLow = appDataLocalLow;
+    if (appDataRoaming  !== undefined) facts.appDataRoaming  = appDataRoaming;
     return facts;
   }
 
