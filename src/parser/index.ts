@@ -630,12 +630,27 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }
   }
 
+  // `executable` accepts a plain path or a branch (see GameNode). Route the
+  // non-scalar form through parseValueNode so `storeBranch:` is understood; keep
+  // the plain String() coercion otherwise so scalar games are byte-identical.
+  const executableYaml = gameNode.get('executable', true);
+  const executable: string | ValueNode = isMap(executableYaml)
+    ? parseValueNode(executableYaml, file, source)
+    : String(gameNode.get('executable') ?? '');
+
+  let xboxLauncher: { appExecName: string } | undefined;
+  const xboxLauncherYaml = gameNode.get('xboxLauncher', true);
+  if (isMap(xboxLauncherYaml)) {
+    xboxLauncher = { appExecName: String(xboxLauncherYaml.get('appExecName') ?? '') };
+  }
+
   const game: GameNode = {
     kind: 'game',
     id: String(gameNode.get('id') ?? ''),
     name: String(gameNode.get('name') ?? ''),
-    executable: String(gameNode.get('executable') ?? ''),
+    executable,
     requiredFiles,
+    ...(xboxLauncher !== undefined && { xboxLauncher }),
     ...(gameNode.has('logo')          && { logo:          String(gameNode.get('logo')) }),
     ...(gameNode.has('author')        && { author:        String(gameNode.get('author')) }),
     ...(gameNode.has('nexusDomain')   && { nexusDomain:   String(gameNode.get('nexusDomain')) }),

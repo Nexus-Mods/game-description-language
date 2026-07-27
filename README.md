@@ -82,6 +82,74 @@ game:
   nexusDomain: subnautica2
 ```
 
+#### `executable` vs `requiredFiles`
+
+These do different jobs. They match in most games only because the exe is a convenient marker — they
+are not required to, and forcing them to match breaks multi-store games.
+
+- **`executable`** is the **launch target**. Vortex also reads it for process monitoring ("is the game
+  running") and for `getGameVersion`, which silently reports version `0.0.0` when the path doesn't
+  exist — so a wrong value degrades quietly rather than erroring.
+- **`requiredFiles`** is a **discovery fingerprint**, answering "is this folder really this game?".
+  **Every entry must exist** or the candidate directory is rejected, and paths are literal — **no glob
+  expansion**. It is the only list Vortex verifies, and the only one that produces a user-visible
+  error.
+
+A consequence worth knowing: if the exe path differs per store, you cannot list both variants in
+`requiredFiles` — all-must-exist means neither store would match. Point `requiredFiles` at a file
+present at the same relative path on every store instead (for UE5 titles,
+`<Project>/Content/Paks/global.utoc` is often a good marker), and let `executable` branch.
+
+#### Store-specific executables
+
+`executable` is normally a single path. Reach for `storeBranch` **only** when the exe genuinely
+differs per store — the common case is Xbox/Game Pass builds shipping under `Binaries/WinGDK` where
+Steam uses `Binaries/Win64`. Most games, including every Steam-only game, need nothing more than
+`executable: MyGame.exe`.
+
+```yaml
+game:
+  executable:
+    storeBranch:
+      xbox: Meteorite/Binaries/WinGDK/HaloCampaignEvolved.exe
+      default: Meteorite/Binaries/Win64/HaloCampaignEvolved.exe
+```
+
+The arms work like the `context:` branches described below, with two rules specific to this position:
+
+- The **`default` arm must be the store-independent path.** Vortex caches the no-argument call as the
+  Play-button fallback, so it has to resolve without knowing the store.
+- Only `storeBranch` is accepted — not `osBranch`/`versionBranch`. Vortex resolves the executable
+  during discovery, when the store is the only fact available.
+
+When the store isn't known yet — which is the case on the very first discovery, because Vortex calls
+`executable()` before `queryPath()` — the runtime probes each arm against the discovered path and uses
+whichever exists on disk, falling back to `default`. That probe is what lets Vortex persist the
+store-correct path.
+
+#### Xbox launching (`xboxLauncher`)
+
+**Xbox/Game Pass games cannot be launched from an exe path.** Vortex only routes through
+`shell:appsFolder\…` when the extension declares `requiresLauncher`; without it a GDK title is
+bare-spawned, fails licence validation and exits — and Vortex reports that as a *successful* launch.
+Declare `xboxLauncher` for any game with an `xbox` store:
+
+```yaml
+game:
+  xboxLauncher: { appExecName: AppHaloCampaignEvolvedShipping }
+stores:
+  xbox: "Microsoft.198377053870B"     # supplies the launcher's appId
+```
+
+`appExecName` is the package's `<Application Id="…">`. Read it from the install's `appxmanifest.xml`,
+or from `Packages[].Applications[].ApplicationId` in the Microsoft store catalog — **never infer it
+from the game name.** `App<Project>Shipping` is a common Unreal convention but not a rule (Starfield's
+is simply `Game`), and Vortex's own fallback is the literal string `"App"`, which is wrong for most
+games.
+
+`xboxLauncher` and a branched `executable` are independent: a game whose exe sits at the same relative
+path on both stores needs only the launcher.
+
 ### Context bindings
 
 The `context:` block defines path templates and values that other blocks reference via `${name}`. Branch on the discovered store, OS, or version:

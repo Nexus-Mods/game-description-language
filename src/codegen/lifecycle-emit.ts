@@ -17,6 +17,7 @@ import type { DocumentNode, ValueNode } from '../parser/ast.js';
 import type { ContextSpec, DiscoveryFacts, ResolvableValue } from '../runtime/context-resolver.js';
 import { resolveContext, windowsAppDataFacts } from '../runtime/context-resolver.js';
 import { interpolate } from '../runtime/interpolate.js';
+import { resolveBranch, type BranchValue } from '../runtime/branch-tags.js';
 import { sq } from './emit.js';
 
 // AST ValueNode → runtime ResolvableValue. The AST type is a superset
@@ -90,7 +91,12 @@ const computeScenarios = (doc: DocumentNode): Scenario[] => {
     // Use the per-store override if declared; otherwise default to a path that
     // contains the game id (so absolute-path assertions stay stable).
     const installPath = overrides[store]?.installPath ?? `/games/${doc.game.id}`;
-    const facts = buildFacts(doc.game.id, doc.game.executable, store, installPath);
+    // A branched `executable` resolves per store, so each scenario gets the exe
+    // that store actually uses (e.g. Binaries/WinGDK on xbox).
+    const exe = typeof doc.game.executable === 'string'
+      ? doc.game.executable
+      : String((resolveBranch(doc.game.executable as BranchValue, { store }) as { raw?: unknown })?.raw ?? '');
+    const facts = buildFacts(doc.game.id, exe, store, installPath);
     const ctx = resolveContext(spec, facts);
     const expectedSetupDirs = setupDirs.map(t => interpolate(t, ctx));
     const scenario: Scenario = {

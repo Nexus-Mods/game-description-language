@@ -201,6 +201,19 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
 
   const reqFiles = `[${doc.game.requiredFiles.map(sq).join(', ')}]`;
 
+  // A scalar `executable` stays a plain string so scalar games emit byte-identically;
+  // a branch is emitted as a ValueNode for the shim to resolve per-store.
+  const executableLit = typeof doc.game.executable === 'string'
+    ? sq(doc.game.executable)
+    : renderValueNode(doc.game.executable);
+
+  // Xbox launching requires this hook — see GameNode.xboxLauncher. appId is the
+  // declared xbox store value; the validator guarantees one exists.
+  const xboxStore = doc.stores?.entries.find(e => e.id === 'xbox');
+  const xboxLauncherLit = (doc.game.xboxLauncher && xboxStore)
+    ? `\n      xboxLauncher: { appId: ${sq(String(xboxStore.value))}, appExecName: ${sq(doc.game.xboxLauncher.appExecName)} },`
+    : '';
+
   // Custom installer hooks live in src/hooks.ts; installers.gen.ts references
   // them by name, so import the hooks module when any installer uses one.
   const usesInstallerHooks = (doc.installers ?? []).some(i => i.installHook !== undefined);
@@ -230,8 +243,8 @@ export default function main(api: IExtensionContext): boolean {
     {
       id: ${sq(doc.game.id)},
       name: ${sq(doc.game.name)},
-      executable: ${sq(doc.game.executable)},
-      requiredFiles: ${reqFiles},
+      executable: ${executableLit},
+      requiredFiles: ${reqFiles},${xboxLauncherLit}
       ${doc.game.logo ? `logo: ${sq(doc.game.logo)},` : ''}
       ${doc.game.nexusDomain ? `nexusDomain: ${sq(doc.game.nexusDomain)},` : ''}
       ${doc.game.queryModPath ? `queryModPath: ${sq(doc.game.queryModPath)},` : ''}

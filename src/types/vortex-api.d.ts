@@ -3,13 +3,22 @@ declare module 'vortex-api' {
     id: string;
     name: string;
     shortName?: string;
-    executable: () => string;
+    // Vortex passes the discovered path during discovery and persists the result
+    // when it differs from the no-argument call (see gamemode_management/util/
+    // discovery.ts). The no-arg form is cached as IGameStored.executable.
+    executable: (discoveryPath?: string) => string;
     logo?: string;
     requiredFiles: string[];
     contributed?: string;
     environment?: Record<string, string>;
     details?: Record<string, unknown>;
     queryPath: () => Promise<string | { path: string; store?: string }>;
+    // Route launching through a game store instead of spawning the exe. Required
+    // for Xbox/Game Pass, which needs `shell:appsFolder\<family>!<appExecName>`.
+    requiresLauncher?: (
+      gamePath: string,
+      store?: string,
+    ) => Promise<{ launcher: string; addInfo?: unknown } | undefined>;
     mergeMods: boolean | ((mod: unknown) => string);
     queryModPath: (gamePath: string) => string;
     setup?: (discovery: { path?: string; store?: string }) => Promise<void>;

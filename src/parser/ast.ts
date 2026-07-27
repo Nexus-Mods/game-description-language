@@ -36,8 +36,21 @@ export interface GameNode extends Node {
   kind: 'game';
   id: string;
   name: string;
-  executable: string;
+  // Vortex's launch target, and also the path its ProcessMonitor and
+  // getGameVersion read. Usually a plain path; a `storeBranch:` is only needed
+  // when the exe genuinely differs per store (Xbox/Game Pass builds ship under
+  // Binaries/WinGDK where Steam uses Binaries/Win64). The `default` arm must be
+  // the store-independent path: Vortex caches the no-argument call as the
+  // Play-button fallback, so it has to resolve without knowing the store.
+  executable: string | ValueNode;
   requiredFiles: string[];
+  // Xbox/Game Pass launch info. Xbox games CANNOT be launched without this:
+  // `requiresLauncher` is the only route to `shell:appsFolder\...` in Vortex, and
+  // without it Vortex bare-spawns the exe, which a GDK title rejects (silently —
+  // Vortex reports the failed launch as a success). `appId` is taken from the
+  // declared `stores.xbox`; `appExecName` is the package's `<Application Id>` and
+  // must be read from the appxmanifest or the store catalog, never inferred.
+  xboxLauncher?: { appExecName: string };
   logo?: string;
   // Extension author. Emitted into info.json, where Vortex reads it to derive
   // game.contributed and official-vs-community status (see gamemode_management).
