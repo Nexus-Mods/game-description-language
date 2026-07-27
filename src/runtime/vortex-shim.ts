@@ -15,11 +15,17 @@ interface IDiscoveryResult {
   appDataRoaming?: string;
 }
 import { interpolate } from './interpolate.js';
-import { resolveBranch } from './branch-tags.js';
+import { resolveBranch, type BranchValue } from './branch-tags.js';
 import type { InstallerRule } from './installer-engine.js';
 import { buildInstallPlan, ruleSupports } from './installer-engine.js';
 
 const normaliseArchivePath = (path: string): string => path.replace(/\\/g, '/');
+
+// Join a discovered install path with a game-relative candidate for an existence
+// check. Kept local (rather than importing node:path) so the shim stays free of
+// node builtins at module scope; statSync tolerates mixed separators on Windows.
+const joinPath = (base: string, rel: string): string =>
+  `${base.replace(/[\\/]+$/, '')}/${rel.replace(/^[\\/]+/, '')}`;
 
 // `stores:` is the single source of truth for store ids. Project each one into
 // `game.details` under a conventional `<storeId>AppId` key so authors don't repeat
@@ -44,8 +50,12 @@ function deriveStoreDetails(stores: StoreDecl[]): Record<string, string | number
 export interface GameDecl {
   id: string;
   name: string;
-  executable: string;
+  // Plain path, or a storeBranch ValueNode when the exe differs per store.
+  // See resolveExecutable() for the resolution order and why a probe is needed.
+  executable: string | BranchValue;
   requiredFiles: string[];
+  // Present only for games declaring `game.xboxLauncher` + `stores.xbox`.
+  xboxLauncher?: { appId: string; appExecName: string };
   logo?: string;
   nexusDomain?: string;
   details?: Record<string, unknown>;
@@ -120,6 +130,76 @@ export class GdlRuntime {
       // vortex-api not resolvable (unit tests without the seam set). Callers
       // treat undefined as "not discovered yet".
       return undefined;
+    }
+  }
+
+  // Resolve `game.executable`, which Vortex calls both with and without a
+  // discovered path.
+  //
+  // Ordering matters here and is not obvious: Vortex calls executable() during
+  // DISCOVERY (to build the IDiscoveryResult), which is before queryPath() has
+  // run — so resolvedCtx is empty and discoveredStore may be unset on the very
+  // call whose result gets persisted. Vortex stores the result only when the
+  // path-aware call differs from the no-arg call, so a store branch alone would
+  // be a no-op exactly when it matters. Hence the filesystem probe.
+  //
+  //   1. no discoveryPath -> always the default arm. Vortex caches the no-arg
+  //      call as IGameStored.executable and uses it as the Play-button fallback,
+  //      so it must be stable and store-independent.
+  //   2. store known (live discovery, else the cached discoveredStore) -> branch.
+  //   3. store unknown -> probe each arm against discoveryPath; first hit wins.
+  //   4. nothing matched -> the default arm.
+  //
+  // Must stay synchronous (IGame.executable is sync) and must never throw.
+  private resolveExecutable(decl: GameDecl, discoveryPath?: string): string {
+    const exe = decl.executable;
+    if (typeof exe === 'string') return exe;
+
+    const defaultArm = String((exe.default as { raw?: unknown })?.raw ?? '');
+    if (discoveryPath === undefined) return defaultArm;
+
+    let store = this.discoveredStore;
+    if (!store && this.gameId) {
+      try {
+        store = this.liveDiscovery(this.gameId)?.store;
+      } catch {
+        // Discovery not readable yet — fall through to the probe.
+      }
+    }
+    if (store) {
+      const armed = resolveBranch(exe, { store }) as { raw?: unknown } | undefined;
+      const resolved = String(armed?.raw ?? '');
+      if (resolved) return resolved;
+    }
+
+    // Store not known yet (first discovery): pick whichever arm is actually on disk.
+    for (const arm of Object.values(exe.arms)) {
+      const candidate = String((arm as { raw?: unknown })?.raw ?? '');
+      if (!candidate) continue;
+      if (this.fileExists(joinPath(discoveryPath, candidate))) return candidate;
+    }
+    return defaultArm;
+  }
+
+  // Overridable so unit tests can exercise resolveExecutable's probe without
+  // touching the filesystem. Production reads node:fs lazily — the shim is
+  // bundled for Vortex's renderer, where a top-level fs import is undesirable.
+  private fileExistsFn?: (p: string) => boolean;
+
+  setFileExistsForTesting(fn: (p: string) => boolean): void {
+    this.fileExistsFn = fn;
+  }
+
+  private fileExists(p: string): boolean {
+    try {
+      if (this.fileExistsFn) return this.fileExistsFn(p);
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs') as typeof import('fs');
+      fs.statSync(p);
+      return true;
+    } catch {
+      // Unreadable path, permission error, or fs unavailable — treat as absent.
+      return false;
     }
   }
 
@@ -220,8 +300,25 @@ export class GdlRuntime {
     const game: IGame = {
       id: decl.id,
       name: decl.name,
-      executable: () => decl.executable,
+      executable: (discoveryPath?: string) => this.resolveExecutable(decl, discoveryPath),
       requiredFiles: decl.requiredFiles,
+      // Xbox/Game Pass cannot be launched from an exe path: Vortex only emits
+      // `shell:appsFolder\...` via this hook, and without it a GDK title is
+      // bare-spawned, fails licence validation and exits — which Vortex reports
+      // as a successful launch. `parameters` must be a non-empty array; the xbox
+      // store extension does `appInfo.parameters.find(...)` unguarded.
+      ...(decl.xboxLauncher !== undefined && {
+        requiresLauncher: async (_gamePath: string, store?: string) =>
+          store === 'xbox'
+            ? {
+                launcher: 'xbox',
+                addInfo: {
+                  appId: decl.xboxLauncher!.appId,
+                  parameters: [{ appExecName: decl.xboxLauncher!.appExecName }],
+                },
+              }
+            : undefined,
+      }),
       ...(decl.logo          !== undefined && { logo:        decl.logo }),
       ...(steamAppId !== undefined && { environment: { SteamAPPId: steamAppId } }),
       details: {

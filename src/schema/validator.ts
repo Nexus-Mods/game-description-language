@@ -66,12 +66,39 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     });
   }
 
-  if (!doc.game.executable.trim()) {
-    errors.push({
-      code: 'GDL104',
-      message: 'game.executable is required',
-      span: doc.game.span,
-    });
+  // `executable` is either a plain path or a branch (see GameNode). For a branch
+  // every arm must be a non-empty literal path, including `default` — Vortex caches
+  // the no-argument call as the Play-button fallback, so the default has to resolve
+  // without a store.
+  if (typeof doc.game.executable === 'string') {
+    if (!doc.game.executable.trim()) {
+      errors.push({
+        code: 'GDL104',
+        message: 'game.executable is required',
+        span: doc.game.span,
+      });
+    }
+  } else {
+    const exe = doc.game.executable;
+    if (exe.kind !== 'storeBranch') {
+      errors.push({
+        code: 'GDL104',
+        message: `game.executable must be a path or a storeBranch, not ${exe.kind}`,
+        span: exe.span,
+        hint: 'osBranch/versionBranch are not supported here: Vortex resolves the executable during discovery, when only the store is known.',
+      });
+    } else {
+      const arms = Object.entries(exe.arms);
+      for (const [arm, value] of [...arms, ['default', exe.default] as const]) {
+        if (value.kind !== 'literal' || !String(value.raw).trim()) {
+          errors.push({
+            code: 'GDL104',
+            message: `game.executable storeBranch arm \`${arm}\` must be a non-empty path`,
+            span: value.span ?? exe.span,
+          });
+        }
+      }
+    }
   }
 
   if (doc.game.requiredFiles.length === 0) {
@@ -80,6 +107,28 @@ export const validate = (doc: DocumentNode): BuildError[] => {
       message: 'game.requiredFiles must list at least one file',
       span: doc.game.span,
     });
+  }
+
+  // `xboxLauncher` supplies appExecName; the appId comes from `stores.xbox`, so the
+  // launcher is meaningless without it.
+  if (doc.game.xboxLauncher !== undefined) {
+    if (!doc.game.xboxLauncher.appExecName.trim()) {
+      errors.push({
+        code: 'GDL115',
+        message: 'game.xboxLauncher.appExecName is required',
+        span: doc.game.span,
+        hint: 'Read `<Application Id="...">` from the install\'s appxmanifest.xml, or Packages[].Applications[].ApplicationId from the store catalog. Never infer it from the game name.',
+      });
+    }
+    const hasXbox = doc.stores?.entries.some(e => e.id === 'xbox') ?? false;
+    if (!hasXbox) {
+      errors.push({
+        code: 'GDL116',
+        message: 'game.xboxLauncher requires an `xbox` entry in `stores:`',
+        span: doc.game.span,
+        hint: 'The launcher\'s appId is the declared xbox store value (the package Identity Name).',
+      });
+    }
   }
 
   if (doc.modTypes) {

@@ -389,3 +389,156 @@ describe('GdlRuntime — setup() honors injected appData regardless of host OS',
     expect(calls).toContain('/fake/AppData/LocalLow/Paraish');
   });
 });
+
+describe('GdlRuntime — store-specific executable', () => {
+  const makeCtx = () => ({
+    registerGame: vi.fn(),
+    registerModType: vi.fn(),
+    registerInstaller: vi.fn(),
+    registerAction: vi.fn(),
+    api: { getState: () => ({}), events: { on: vi.fn() } },
+  }) as unknown as IExtensionContext;
+
+  const emptyCtxSpec = { bindings: [] } as unknown as ContextSpec;
+  const registeredGame = (ctx: IExtensionContext) =>
+    (ctx.registerGame as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+
+  const lit = (raw: string) => ({ kind: 'literal' as const, raw });
+  const branchedExe = {
+    kind: 'storeBranch' as const,
+    arms: { xbox: lit('Meteorite/Binaries/WinGDK/Halo.exe') },
+    default: lit('Meteorite/Binaries/Win64/Halo.exe'),
+  };
+  const branchedDecl = {
+    id: 'halo',
+    name: 'Halo',
+    executable: branchedExe,
+    requiredFiles: ['Meteorite/Content/Paks/global.utoc'],
+  };
+
+  // A scalar executable must behave exactly as before — this is the regression
+  // guard for the eight games that don't branch.
+  it('scalar executable returns the literal for both the no-arg and path-aware call', () => {
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { id: 'sn2', name: 'Subnautica 2', executable: 'Subnautica2.exe', requiredFiles: ['Subnautica2.exe'] },
+      [{ id: 'steam', value: '1962700' }],
+      emptyCtxSpec,
+      [],
+    );
+    const { executable } = registeredGame(ctx);
+    expect(executable()).toBe('Subnautica2.exe');
+    expect(executable('/games/sn2')).toBe('Subnautica2.exe');
+  });
+
+  it('resolves the xbox arm when the discovered store is xbox', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    runtime.registerGame(branchedDecl, [{ id: 'xbox', value: 'Microsoft.X' }], emptyCtxSpec, []);
+    runtime.setDiscoveredStore('xbox');
+    expect(registeredGame(ctx).executable('/games/halo')).toBe('Meteorite/Binaries/WinGDK/Halo.exe');
+  });
+
+  it('resolves the default arm for a non-xbox store', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    runtime.registerGame(branchedDecl, [{ id: 'steam', value: '1' }], emptyCtxSpec, []);
+    runtime.setDiscoveredStore('steam');
+    expect(registeredGame(ctx).executable('/games/halo')).toBe('Meteorite/Binaries/Win64/Halo.exe');
+  });
+
+  // The case that makes discovery.executable actually persist: Vortex calls
+  // executable(path) during discovery, before any store is recorded.
+  it('probes the filesystem when the store is not yet known', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    runtime.registerGame(branchedDecl, [{ id: 'xbox', value: 'Microsoft.X' }], emptyCtxSpec, []);
+    runtime.setLiveDiscoveryForTesting(() => undefined);
+    runtime.setFileExistsForTesting(p => p.includes('WinGDK'));
+    expect(registeredGame(ctx).executable('/games/halo')).toBe('Meteorite/Binaries/WinGDK/Halo.exe');
+  });
+
+  it('falls back to the default arm when no candidate exists on disk', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    runtime.registerGame(branchedDecl, [{ id: 'xbox', value: 'Microsoft.X' }], emptyCtxSpec, []);
+    runtime.setLiveDiscoveryForTesting(() => undefined);
+    runtime.setFileExistsForTesting(() => false);
+    expect(registeredGame(ctx).executable('/games/halo')).toBe('Meteorite/Binaries/Win64/Halo.exe');
+  });
+
+  // Vortex caches the no-arg call as IGameStored.executable and uses it as the
+  // Play-button fallback, so it must never depend on the discovered store.
+  it('no-arg call always returns the default arm, even when the store is xbox', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    runtime.registerGame(branchedDecl, [{ id: 'xbox', value: 'Microsoft.X' }], emptyCtxSpec, []);
+    runtime.setDiscoveredStore('xbox');
+    expect(registeredGame(ctx).executable()).toBe('Meteorite/Binaries/Win64/Halo.exe');
+  });
+
+  it('never throws when live discovery or the filesystem probe blows up', () => {
+    const ctx = makeCtx();
+    const runtime = new GdlRuntime(ctx);
+    runtime.registerGame(branchedDecl, [{ id: 'xbox', value: 'Microsoft.X' }], emptyCtxSpec, []);
+    runtime.setLiveDiscoveryForTesting(() => { throw new Error('state not ready'); });
+    runtime.setFileExistsForTesting(() => { throw new Error('EACCES'); });
+    expect(() => registeredGame(ctx).executable('/games/halo')).not.toThrow();
+  });
+});
+
+describe('GdlRuntime — xbox requiresLauncher', () => {
+  const makeCtx = () => ({
+    registerGame: vi.fn(),
+    registerModType: vi.fn(),
+    registerInstaller: vi.fn(),
+    registerAction: vi.fn(),
+    api: { getState: () => ({}), events: { on: vi.fn() } },
+  }) as unknown as IExtensionContext;
+  const emptyCtxSpec = { bindings: [] } as unknown as ContextSpec;
+  const registeredGame = (ctx: IExtensionContext) =>
+    (ctx.registerGame as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+
+  const decl = {
+    id: 'halo',
+    name: 'Halo',
+    executable: 'Meteorite/Binaries/Win64/Halo.exe',
+    requiredFiles: ['Meteorite/Content/Paks/global.utoc'],
+    xboxLauncher: { appId: 'Microsoft.198377053870B', appExecName: 'AppHaloShipping' },
+  };
+
+  it('routes xbox through the store launcher with appId and appExecName', async () => {
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(decl, [{ id: 'xbox', value: 'Microsoft.198377053870B' }], emptyCtxSpec, []);
+    const res = await registeredGame(ctx).requiresLauncher('/games/halo', 'xbox');
+    expect(res).toEqual({
+      launcher: 'xbox',
+      addInfo: {
+        appId: 'Microsoft.198377053870B',
+        parameters: [{ appExecName: 'AppHaloShipping' }],
+      },
+    });
+    // gamestore-xbox does appInfo.parameters.find(...) unguarded — a missing or
+    // empty array is a TypeError there.
+    expect(res.addInfo.parameters.length).toBeGreaterThan(0);
+  });
+
+  it('returns undefined for non-xbox stores so they launch the exe directly', async () => {
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(decl, [{ id: 'xbox', value: 'Microsoft.X' }], emptyCtxSpec, []);
+    const { requiresLauncher } = registeredGame(ctx);
+    expect(await requiresLauncher('/games/halo', 'steam')).toBeUndefined();
+    expect(await requiresLauncher('/games/halo', undefined)).toBeUndefined();
+  });
+
+  it('is absent entirely when the game declares no xboxLauncher', () => {
+    const ctx = makeCtx();
+    new GdlRuntime(ctx).registerGame(
+      { id: 'sn2', name: 'Subnautica 2', executable: 'Subnautica2.exe', requiredFiles: ['Subnautica2.exe'] },
+      [{ id: 'steam', value: '1' }],
+      emptyCtxSpec,
+      [],
+    );
+    expect(registeredGame(ctx).requiresLauncher).toBeUndefined();
+  });
+});

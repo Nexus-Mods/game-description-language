@@ -483,3 +483,87 @@ installers:
     expect(validate(doc).map(e => e.code)).not.toContain('GDL114');
   });
 });
+
+describe('validate — store-specific executable and xboxLauncher', () => {
+  const doc = (yaml: string) => parseYaml(yaml, 'inline.yaml');
+
+  it('accepts a storeBranch executable alongside an xboxLauncher', () => {
+    expect(validate(doc(`
+gdl: 1
+game:
+  id: halo
+  name: Halo
+  executable:
+    storeBranch:
+      xbox: Meteorite/Binaries/WinGDK/Halo.exe
+      default: Meteorite/Binaries/Win64/Halo.exe
+  requiredFiles: [Meteorite/Content/Paks/global.utoc]
+  xboxLauncher: { appExecName: AppHaloShipping }
+stores:
+  steam: "2806050"
+  xbox: "Microsoft.198377053870B"
+`))).toEqual([]);
+  });
+
+  it('rejects an xboxLauncher without an xbox store (appId comes from it)', () => {
+    const errors = validate(doc(`
+gdl: 1
+game:
+  id: halo
+  name: Halo
+  executable: Halo.exe
+  requiredFiles: [Halo.exe]
+  xboxLauncher: { appExecName: AppHaloShipping }
+stores:
+  steam: "2806050"
+`));
+    expect(errors.map(e => e.code)).toContain('GDL116');
+  });
+
+  it('rejects an empty appExecName rather than letting Vortex default to "App"', () => {
+    const errors = validate(doc(`
+gdl: 1
+game:
+  id: halo
+  name: Halo
+  executable: Halo.exe
+  requiredFiles: [Halo.exe]
+  xboxLauncher: { appExecName: "" }
+stores:
+  xbox: "Microsoft.X"
+`));
+    expect(errors.map(e => e.code)).toContain('GDL115');
+  });
+
+  it('rejects a storeBranch executable with an empty arm', () => {
+    const errors = validate(doc(`
+gdl: 1
+game:
+  id: halo
+  name: Halo
+  executable:
+    storeBranch:
+      xbox: ""
+      default: Halo.exe
+  requiredFiles: [Halo.exe]
+stores:
+  xbox: "Microsoft.X"
+`));
+    expect(errors.map(e => e.code)).toContain('GDL104');
+  });
+
+  it('rejects osBranch on executable — only the store is known at discovery time', () => {
+    const errors = validate(doc(`
+gdl: 1
+game:
+  id: halo
+  name: Halo
+  executable:
+    osBranch:
+      windows: Halo.exe
+      default: Halo
+  requiredFiles: [Halo.exe]
+`));
+    expect(errors.map(e => e.code)).toContain('GDL104');
+  });
+});
