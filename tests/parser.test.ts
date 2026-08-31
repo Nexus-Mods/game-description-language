@@ -55,10 +55,19 @@ describe('parseYaml', () => {
 
   it('parses modTypes block', () => {
     const doc = parseYaml(fixture('with-modtypes.yaml'), 'with-modtypes.yaml');
-    expect(doc.modTypes).toHaveLength(2);
+    expect(doc.modTypes).toHaveLength(3);
     expect(doc.modTypes![0].id).toBe('pak');
     expect(doc.modTypes![0].name).toBe('Pak Mod');
     expect(doc.modTypes![0].path).toMatchObject({ kind: 'interpolated', template: '${modsRoot}' });
+  });
+
+  it('parses modType deploymentEssential, leaving it undefined when absent', () => {
+    const doc = parseYaml(fixture('with-modtypes.yaml'), 'with-modtypes.yaml');
+    // Absent must stay undefined rather than defaulting to true here: the
+    // emitter omits the key so Vortex keeps its own default.
+    expect(doc.modTypes![0].deploymentEssential).toBeUndefined();
+    expect(doc.modTypes![2].id).toBe('config');
+    expect(doc.modTypes![2].deploymentEssential).toBe(false);
   });
 
   it('parses installers with !hasFile predicate', () => {

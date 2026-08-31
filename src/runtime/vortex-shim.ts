@@ -70,6 +70,7 @@ export interface ModTypeDecl {
   id: string;
   name: string;
   path: ResolvableValue;
+  deploymentEssential?: boolean;
 }
 
 export interface StoreDecl {
@@ -405,7 +406,15 @@ export class GdlRuntime {
           return this.resolveModTypePath(mt, ctx as ResolvedContext);
         },
         async () => true,
-        { name: mt.name },
+        // Spread rather than always passing the key: Vortex reads it as
+        // `deploymentEssential === false`, and its own default is true, so an
+        // absent key and an explicit `true` behave identically. Omitting keeps
+        // the registration byte-identical for every game that doesn't set it.
+        {
+          name: mt.name,
+          ...(mt.deploymentEssential !== undefined
+            && { deploymentEssential: mt.deploymentEssential }),
+        },
       );
     }
 

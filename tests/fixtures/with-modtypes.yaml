@@ -13,3 +13,9 @@ modTypes:
   - id: lua
     name: Lua Mod
     path: ${installPath}/Scripts
+  # Deploys outside the game folder, so it must not remove hardlink/move for
+  # the whole game when the staging folder is on another volume.
+  - id: config
+    name: Config
+    path: ${appDataLocal}/HelloWorld/Config
+    deploymentEssential: false

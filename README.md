@@ -179,6 +179,34 @@ modTypes:
 
 Each `modType.path` is a template. The runtime re-interpolates it on every Vortex call to `getPath`, so re-discovery after a game-path change is reflected on the next path query.
 
+#### `deploymentEssential`
+
+```yaml
+modTypes:
+  - { id: pak,    name: Paks,   path: "${paksRoot}" }
+  - { id: config, name: Config, path: "${appDataLocal}/MyGame/Saved/Config/Windows",
+      deploymentEssential: false }
+```
+
+Vortex drops a deployment method entirely if it cannot handle **any** registered modType, not just the ones holding mods. Hardlink and move both require a modType's target to be on the same volume as the **mod staging folder**, so a single modType pointing outside the game folder (a user config dir on C: while the game is on D:) removes hardlink *and* move for the whole game. Symlink is then all that is left, and if the game also refuses symlinks the user gets **no deployment method at all**.
+
+`deploymentEssential: false` demotes that from an error to a warning, keeping hardlink available. Set it on any modType whose target can land on a different volume from the game.
+
+Two caveats:
+
+- **It does not make cross-volume deployment work.** A mod of that type still fails to deploy for
+  those users, with `EXDEV: cross-device link not permitted`. `LinkingDeployment` catches this per
+  file, so the rest of the deployment completes normally and only that mod's files are missing.
+  Verified on a real install, 2026-08-31.
+
+  The user-visible part is the problem: Vortex reports **"Deployment failed — N files were not
+  correctly deployed. The most likely reason is that files were locked by external applications"**.
+  That diagnosis is wrong for a cross-volume link, and there is nothing the user can do about it by
+  closing applications. If a game relies on this flag, say so in its release notes, or the reports
+  will arrive as "deployment is broken".
+- Omit the key to leave Vortex on its own default (`true`). An explicit `true` is equivalent but
+  claims a decision you did not make; the emitter omits the key entirely when it is unset.
+
 ### Installer routing
 
 An installer matches archives with `when:` (must match) / `unless:` (must not match) predicates and takes exactly one of four forms:

@@ -717,11 +717,16 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
           span: spanOf(file, source, entry as YamlNode),
         }]);
       }
+      const deploymentEssential = entry.get('deploymentEssential');
       modTypes.push({
         kind: 'modType',
         id: String(entry.get('id') ?? ''),
         name: String(entry.get('name') ?? ''),
         path: parseValueNode(entry.get('path', true) as YamlNode, file, source),
+        // Kept undefined when absent so the emitter can omit the key and leave
+        // Vortex on its own default rather than restating it.
+        ...(deploymentEssential !== undefined && deploymentEssential !== null
+          && { deploymentEssential: deploymentEssential as boolean }),
         span: spanOf(file, source, entry),
       });
     }
