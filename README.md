@@ -199,7 +199,7 @@ Two caveats:
   file, so the rest of the deployment completes normally and only that mod's files are missing.
   Verified on a real install, 2026-08-31.
 
-  The user-visible part is the problem: Vortex reports **"Deployment failed — N files were not
+  The user-visible part is the problem: Vortex reports **"Deployment failed. N files were not
   correctly deployed. The most likely reason is that files were locked by external applications"**.
   That diagnosis is wrong for a cross-volume link, and there is nothing the user can do about it by
   closing applications. If a game relies on this flag, say so in its release notes, or the reports
