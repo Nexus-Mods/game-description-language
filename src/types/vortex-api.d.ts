@@ -75,7 +75,10 @@ declare module 'vortex-api' {
       isSupported: (gameId: string) => boolean,
       getPath: (game: IGame) => string,
       test: (instructions: unknown) => Promise<boolean>,
-      options?: { name?: string },
+      // Vortex's IModTypeOptions is wider than this; only the keys GDL emits are
+      // declared. `deploymentEssential: false` stops an unsupported modType
+      // removing a deployment method from the whole game.
+      options?: { name?: string; deploymentEssential?: boolean },
     ) => void;
     registerInstaller: (
       id: string,

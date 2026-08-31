@@ -148,6 +148,17 @@ export const validate = (doc: DocumentNode): BuildError[] => {
           span: mt.span,
         });
       }
+      // A non-boolean here would reach Vortex verbatim, where anything other
+      // than the literal `false` is treated as essential — so a typo'd
+      // `deploymentEssential: "false"` would silently keep the old behaviour.
+      if (mt.deploymentEssential !== undefined && typeof mt.deploymentEssential !== 'boolean') {
+        errors.push({
+          code: 'GDL108',
+          message: `modType \`${mt.id}\`: deploymentEssential must be a boolean`,
+          span: mt.span,
+          hint: 'Vortex only treats the literal `false` as non-essential; any other value means essential.',
+        });
+      }
       seen.add(mt.id);
     }
   }

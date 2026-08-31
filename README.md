@@ -179,6 +179,24 @@ modTypes:
 
 Each `modType.path` is a template. The runtime re-interpolates it on every Vortex call to `getPath`, so re-discovery after a game-path change is reflected on the next path query.
 
+#### `deploymentEssential`
+
+```yaml
+modTypes:
+  - { id: pak,    name: Paks,   path: "${paksRoot}" }
+  - { id: config, name: Config, path: "${appDataLocal}/MyGame/Saved/Config/Windows",
+      deploymentEssential: false }
+```
+
+Vortex drops a deployment method entirely if it cannot handle **any** registered modType, not just the ones holding mods. Hardlink and move both require a modType's target to be on the same volume as the **mod staging folder**, so a single modType pointing outside the game folder (a user config dir on C: while the game is on D:) removes hardlink *and* move for the whole game. Symlink is then all that is left, and if the game also refuses symlinks the user gets **no deployment method at all**.
+
+`deploymentEssential: false` demotes that from an error to a warning, keeping hardlink available. Set it on any modType whose target can land on a different volume from the game.
+
+Two caveats:
+
+- **It does not make cross-volume deployment work.** If a user on such a setup installs a mod of that type, the deploy still fails: Vortex's hardlink has no cross-device fallback and its deploy loop has no per-modType error handling, so the whole deployment aborts. The flag buys "everything else deploys", not "this deploys".
+- Omit the key to leave Vortex on its own default (`true`). An explicit `true` is equivalent but claims a decision you did not make; the emitter omits the key entirely when it is unset.
+
 ### Installer routing
 
 An installer matches archives with `when:` (must match) / `unless:` (must not match) predicates and takes exactly one of four forms:

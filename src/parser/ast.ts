@@ -88,6 +88,12 @@ export interface ModTypeNode extends Node {
   id: string;
   name: string;
   path: ValueNode;
+  // Vortex drops a deployment method entirely if it can't handle ANY registered
+  // modType, so one target outside the game folder (a user config dir on C:
+  // while the game is on D:) removes hardlink and move for the whole game.
+  // `false` demotes that from an error to a warning. Omitted means Vortex's
+  // own default, which is `true`.
+  deploymentEssential?: boolean;
 }
 
 export type TakeStrategy = 'self' | 'parent' | 'parent.parent' | 'archive-root' | { depth: number };

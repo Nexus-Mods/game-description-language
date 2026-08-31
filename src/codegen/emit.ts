@@ -135,7 +135,11 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     .join(',\n');
 
   const modTypes = (doc.modTypes ?? [])
-    .map(mt => `      { id: ${sq(mt.id)}, name: ${sq(mt.name)}, path: ${renderValueNode(mt.path)} }`)
+    .map(mt => `      { id: ${sq(mt.id)}, name: ${sq(mt.name)}, path: ${renderValueNode(mt.path)}`
+      // Omitted when unset so Vortex keeps its own default rather than us
+      // restating it and owning a value we didn't choose.
+      + (mt.deploymentEssential !== undefined ? `, deploymentEssential: ${mt.deploymentEssential}` : '')
+      + ' }')
     .join(',\n');
 
   const installers = (doc.installers ?? [])

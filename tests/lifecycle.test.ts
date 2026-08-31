@@ -82,6 +82,27 @@ describe('GdlRuntime: registerGame', () => {
     expect(h.registered.modTypes).toHaveLength(2);
   });
 
+  // The whole point of deploymentEssential is what Vortex receives, so assert
+  // the options bag rather than the declaration.
+  it('passes deploymentEssential through to registerModType, and omits it when unset', () => {
+    const { h, runtime } = buildRuntime();
+    runtime.registerGame(GAME_DECL, STORES, CONTEXT_SPEC, [
+      ...MOD_TYPES,
+      {
+        id: 'fake-config',
+        name: 'Config',
+        path: { kind: 'interpolated' as const, template: '${installPath}/Config' },
+        deploymentEssential: false,
+      },
+    ]);
+
+    const byId = new Map(h.registered.modTypes.map(mt => [mt.id, mt.options]));
+    expect(byId.get('fake-config')).toMatchObject({ deploymentEssential: false });
+    // Absent must not appear at all: Vortex defaults to essential, and an
+    // explicit `true` would mean we own a value we never chose.
+    expect(byId.get('fake-pak')).not.toHaveProperty('deploymentEssential');
+  });
+
   it('did-deploy listener is deferred to context.once(), not wired synchronously', async () => {
     // Repro of game-subnautica2 GH #6. Vortex's IExtensionContext docs require
     // api-touching wiring to happen inside the once() callback because api is
