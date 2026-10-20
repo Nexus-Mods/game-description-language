@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "archive": { "size": 1400, "hashes": { "MD5": "e95c508f0dfc3dec27bdb52526451c6d" } },
+  "files": [
+    { "file_path": "MyMod/Readme.md", "file_size": 200, "file_hashes": { "MD5": "3cbf97615f61ffa316f0901fad5f7f5a" } },
+    { "file_path": "__MACOSX/MyMod/._CoolPak.pak", "file_size": 176, "file_hashes": { "MD5": "ee79b4a38c6193472e49ebe8bbe505b9" } },
+    { "file_path": "MyMod/CoolPak.pak", "file_size": 1024, "file_hashes": { "MD5": "6fa29b12d45c3bab8a5c42bee3ad7d8a" } }
+  ]
+}

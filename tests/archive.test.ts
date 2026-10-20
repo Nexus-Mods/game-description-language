@@ -45,6 +45,14 @@ describe('readManifestEntries', () => {
       'MyMod/Readme.md',
     ]);
   });
+
+  it('parses a flat v1 manifest (with hashes) into a sorted file list', async () => {
+    const manifestPath = join(import.meta.dirname, 'fixtures', 'corpus-archives', 'typical-pak-v1.json');
+    expect(readManifestEntries(manifestPath)).toEqual([
+      'MyMod/CoolPak.pak',
+      'MyMod/Readme.md',
+    ]);
+  });
 });
 
 describe('readArchiveEntries (dispatch)', () => {

@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { flattenManifest, type PreviewDirectory } from '../nexus/client.js';
+import { flattenManifest, type ModFileManifest, type PreviewDirectory } from '../nexus/client.js';
 
 export const readZipEntries = (zipPath: string): string[] => {
   const zip = new AdmZip(zipPath);
@@ -13,11 +13,11 @@ export const readZipEntries = (zipPath: string): string[] => {
 };
 
 export const readManifestEntries = (jsonPath: string): string[] => {
-  const tree = JSON.parse(readFileSync(jsonPath, 'utf8')) as PreviewDirectory;
-  return flattenManifest(tree).sort();
+  const manifest = JSON.parse(readFileSync(jsonPath, 'utf8')) as PreviewDirectory | ModFileManifest;
+  return flattenManifest(manifest).sort();
 };
 
-// Dispatch by extension: .zip → adm-zip, .json → Nexus file-metadata manifest.
+// Dispatch by extension: .zip → adm-zip, .json → Nexus manifest.
 export const readArchiveEntries = (path: string): string[] => {
   if (path.endsWith('.json')) return readManifestEntries(path);
   if (path.endsWith('.zip'))  return readZipEntries(path);
