@@ -1,6 +1,6 @@
 const NEXUS_GAMES_URL    = 'https://data.nexusmods.com/file/nexus-data/games.json';
 const NEXUS_GRAPHQL_URL  = 'https://api.nexusmods.com/v2/graphql';
-const NEXUS_FILE_META    = 'https://file-metadata.nexusmods.com/file/nexus-files-s3-meta';
+const NEXUS_V3_URL       = 'https://api.nexusmods.com/v3';
 
 export interface NexusGameEntry {
   id: number;
@@ -10,7 +10,7 @@ export interface NexusGameEntry {
 
 export interface NexusModFile {
   uid: string;
-  uri: string;          // file name as used in the S3 metadata URL
+  uri: string;          // legacy file name, or a UUID path for uploads since June 2026
   fileId: number;
   name: string;
   version: string;
@@ -30,6 +30,17 @@ export interface PreviewFile {
   path: string;
   type: 'file';
   size: string;
+}
+
+// The manifest behind v3 `manifest_url`: a flat file list with sizes and hashes.
+// PreviewDirectory above is the older tree format; caches may still hold it.
+export interface ModFileManifest {
+  version: number;
+  files: {
+    file_path: string;
+    file_size: number;
+    file_hashes?: Record<string, string>;
+  }[];
 }
 
 const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
@@ -78,12 +89,19 @@ export const fetchModFiles = async (gameId: number, modId: number): Promise<Nexu
 };
 
 export const fetchArchiveManifest = async (
-  gameId: number,
-  modId: number,
-  fileUri: string,
-): Promise<PreviewDirectory> => {
-  const url = `${NEXUS_FILE_META}/${gameId}/${modId}/${encodeURIComponent(fileUri)}.json`;
-  return fetchJson<PreviewDirectory>(url);
+  gameDomain: string,
+  fileId: number,
+): Promise<ModFileManifest> => {
+  const apiKey = process.env.NEXUS_API_KEY;
+  if (!apiKey) throw new Error('NEXUS_API_KEY is required to look up a manifest');
+  const version = await fetchJson<{ data: { manifest_url: string | null } }>(
+    `${NEXUS_V3_URL}/games/${encodeURIComponent(gameDomain)}/mod-file-versions/${fileId}`,
+    { headers: { apikey: apiKey } },
+  );
+  const manifestUrl = version.data.manifest_url;
+  if (!manifestUrl) throw new Error(`file ${fileId} has no manifest`);
+  // The manifest host is public; don't send the key there.
+  return fetchJson<ModFileManifest>(manifestUrl);
 };
 
 const PUBLISHED_MODS_QUERY = `query($domain: String!, $count: Int!, $offset: Int!) {
@@ -133,11 +151,21 @@ export const fetchPublishedModIds = async (gameDomain: string): Promise<number[]
   return modIds;
 };
 
-export const flattenManifest = (dir: PreviewDirectory): string[] => {
+const flattenTree = (dir: PreviewDirectory): string[] => {
   const out: string[] = [];
   for (const child of dir.children) {
     if (child.type === 'file') out.push(child.path);
-    else out.push(...flattenManifest(child));
+    else out.push(...flattenTree(child));
   }
   return out;
+};
+
+// Accepts either manifest format. The v1 format lists macOS resource forks
+// (`__MACOSX/`) that the older tree dropped; drop them too so they don't show up
+// as unmatched files.
+export const flattenManifest = (manifest: PreviewDirectory | ModFileManifest): string[] => {
+  if (!('files' in manifest)) return flattenTree(manifest);
+  return manifest.files
+    .map(f => f.file_path.replace(/\\/g, '/'))
+    .filter(p => !p.startsWith('__MACOSX/'));
 };

@@ -44,6 +44,11 @@ describe('fetchCorpus --limit', () => {
     expect(mocks.fetchModFiles).toHaveBeenCalledTimes(5);
   });
 
+  it('fetches each manifest by game domain and file id', async () => {
+    await fetchCorpus({ gameDomain: 'testgame', cacheDir: cache(), limit: 1 });
+    expect(mocks.fetchArchiveManifest).toHaveBeenCalledWith('testgame', 7);
+  });
+
   it('limit also caps an explicit --mods list', async () => {
     await fetchCorpus({ gameDomain: 'testgame', cacheDir: cache(), modIds: [10, 11, 12], limit: 1 });
     expect(mocks.fetchPublishedModIds).not.toHaveBeenCalled();

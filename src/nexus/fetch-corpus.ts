@@ -63,7 +63,7 @@ export const fetchCorpus = async (opts: FetchCorpusInputs): Promise<void> => {
         opts.onProgress?.({ kind: 'skipped', archive: cachedName, reason: 'cache hit' });
         continue;
       }
-      const manifest = await fetchArchiveManifest(game.id, modId, file.uri);
+      const manifest = await fetchArchiveManifest(opts.gameDomain, file.fileId);
       await writeFile(cachedPath, JSON.stringify(manifest), 'utf8');
       opts.onProgress?.({ kind: 'fetched', archive: cachedName });
     } catch (e) {

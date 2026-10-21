@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   fetchGames, fetchModFiles, fetchArchiveManifest, flattenManifest, fetchPublishedModIds,
-  type NexusGameEntry, type NexusModFile, type PreviewDirectory,
+  type NexusGameEntry, type NexusModFile, type PreviewDirectory, type ModFileManifest,
 } from '../src/nexus/client.js';
 
 const mkRes = (body: unknown, status = 200): Response =>
@@ -50,16 +50,47 @@ describe('Nexus client', () => {
     }
   });
 
-  it('fetchArchiveManifest URL-encodes the file uri', async () => {
-    const fetchMock = vi.fn(async () => mkRes({
-      name: 'CoolPak.zip', path: '', type: 'directory', children: [],
-    }));
+  it('fetchArchiveManifest looks up manifest_url on v3, then fetches it', async () => {
+    const manifest: ModFileManifest = {
+      version: 1,
+      files: [{ file_path: 'MyMod/CoolPak.pak', file_size: 1024, file_hashes: { MD5: 'abc' } }],
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(mkRes({ data: { manifest_url: 'https://mod-file-manifests.nexusmods.com/0b/88/96/x' } }))
+      .mockResolvedValueOnce(mkRes(manifest));
     vi.stubGlobal('fetch', fetchMock);
-    await fetchArchiveManifest(3333, 100, 'Cool Pak-100-1-0.zip');
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://file-metadata.nexusmods.com/file/nexus-files-s3-meta/3333/100/Cool%20Pak-100-1-0.zip.json',
-      undefined,
-    );
+    process.env.NEXUS_API_KEY = 'k';
+    try {
+      expect(await fetchArchiveManifest('subnautica2', 7)).toEqual(manifest);
+      const [url, init] = fetchMock.mock.calls[0]!;
+      expect(url).toBe('https://api.nexusmods.com/v3/games/subnautica2/mod-file-versions/7');
+      expect((init as RequestInit).headers).toMatchObject({ apikey: 'k' });
+      expect(fetchMock.mock.calls[1]![0]).toBe('https://mod-file-manifests.nexusmods.com/0b/88/96/x');
+    } finally {
+      delete process.env.NEXUS_API_KEY;
+    }
+  });
+
+  it('fetchArchiveManifest throws when the file has no manifest', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => mkRes({ data: { manifest_url: null } })));
+    process.env.NEXUS_API_KEY = 'k';
+    try {
+      await expect(fetchArchiveManifest('subnautica2', 7)).rejects.toThrow(/no manifest/);
+    } finally {
+      delete process.env.NEXUS_API_KEY;
+    }
+  });
+
+  it('flattenManifest reads the flat v1 manifest and drops __MACOSX entries', () => {
+    const manifest: ModFileManifest = {
+      version: 1,
+      files: [
+        { file_path: 'MyMod\\CoolPak.pak', file_size: 1024 },
+        { file_path: '__MACOSX/MyMod/._CoolPak.pak', file_size: 176 },
+        { file_path: 'MyMod/Readme.md', file_size: 200 },
+      ],
+    };
+    expect(flattenManifest(manifest)).toEqual(['MyMod/CoolPak.pak', 'MyMod/Readme.md']);
   });
 
   it('flattenManifest collects file leaves in tree order', () => {
