@@ -97,6 +97,17 @@ export interface EventHooks {
   didDeploy?: DidDeployHook;
 }
 
+// A file merge from the `merges:` block. `test` and `merge` are the user's
+// MergeTest / MergeFunc exports from src/hooks.ts, typed loosely here because
+// their concrete parameter types (IGame, IDiscoveryResult, IMergeFilter) live
+// in the real vortex-api. Method syntax keeps the parameters bivariant, so a
+// hook typed against the real IDiscoveryResult still fits.
+export interface MergeDecl {
+  test(game: IGame, discovery: unknown): unknown;
+  merge(filePath: string, mergeDir: string): Promise<void>;
+  modType: string;
+}
+
 export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
   private cachedFacts?: DiscoveryFacts;
@@ -286,6 +297,7 @@ export class GdlRuntime {
     setupDirs: string[] = [],
     eventHooks: EventHooks = {},
     diagnostics: IModHealthCheck[] = [],
+    merges: MergeDecl[] = [],
   ) {
     // Captured for ensureResolvedCtx(), which lazily rebuilds the context from
     // live discovery when setup()/queryPath() haven't populated it.
@@ -444,6 +456,17 @@ export class GdlRuntime {
     // user-defined IModHealthCheck from src/hooks.ts, passed straight through.
     for (const check of diagnostics) {
       this.api.registerHealthCheck(check);
+    }
+
+    // Vortex runs every registered merge test for whatever game is being
+    // deployed, so gate the user's test on our game id: returning undefined
+    // tells Vortex the merge doesn't apply.
+    for (const m of merges) {
+      this.api.registerMerge(
+        (game, discovery) => (game.id === decl.id ? m.test(game, discovery) : undefined),
+        m.merge,
+        m.modType,
+      );
     }
   }
 

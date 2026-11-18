@@ -29,7 +29,7 @@ const collectHookIds = (doc: DocumentNode): string[] => {
   return [...ids];
 };
 
-// User-named hooks referenced by custom installers and diagnostics; validated
+// User-named hooks referenced by custom installers, diagnostics and merges; validated
 // for export only (they are not fixed catalog entries).
 const collectExportOnlyHookIds = (doc: DocumentNode): string[] => {
   const ids = new Set<string>();
@@ -38,6 +38,10 @@ const collectExportOnlyHookIds = (doc: DocumentNode): string[] => {
   }
   for (const d of doc.diagnostics ?? []) {
     ids.add(d.hook);
+  }
+  for (const m of doc.merges ?? []) {
+    ids.add(m.test.hookId);
+    ids.add(m.merge.hookId);
   }
   return [...ids];
 };

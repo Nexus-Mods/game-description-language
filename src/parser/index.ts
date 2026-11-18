@@ -6,7 +6,7 @@ import type {
   FileVersionNode, VersionSourceNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode,
   ValidatorNode, ValidatorAssertNode, PlacementAssertNode,
-  NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode, DiagnosticNode,
+  NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode, DiagnosticNode, MergeNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -954,6 +954,49 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }
   }
 
+  const mergesYaml = root.get('merges', true);
+  let merges: MergeNode[] | undefined;
+  if (isSeq(mergesYaml)) {
+    merges = [];
+    for (const entry of mergesYaml.items) {
+      if (!isMap(entry)) {
+        throw new BuildErrors([{
+          code: 'GDL200',
+          message: 'merges entries must be mappings with `test:` and `merge:` hook references',
+          span: spanOf(file, source, entry as YamlNode),
+        }]);
+      }
+      const testYaml = entry.get('test', true);
+      const mergeYaml = entry.get('merge', true);
+      if (testYaml === undefined || testYaml === null || mergeYaml === undefined || mergeYaml === null) {
+        throw new BuildErrors([{
+          code: 'GDL201',
+          message: 'merges entry needs both `test: { hook: <id> }` and `merge: { hook: <id> }`',
+          span: spanOf(file, source, entry),
+        }]);
+      }
+      const modTypeYaml = entry.get('modType', true);
+      let modType: string | undefined;
+      if (modTypeYaml !== undefined && modTypeYaml !== null) {
+        if (!isScalar(modTypeYaml) || typeof modTypeYaml.value !== 'string') {
+          throw new BuildErrors([{
+            code: 'GDL202',
+            message: 'merges entry `modType:` must be a string naming a declared modType',
+            span: spanOf(file, source, modTypeYaml as YamlNode),
+          }]);
+        }
+        modType = modTypeYaml.value;
+      }
+      merges.push({
+        kind: 'merge',
+        test: parseHookRef(testYaml as YamlNode, file, source),
+        merge: parseHookRef(mergeYaml as YamlNode, file, source),
+        ...(modType !== undefined && { modType }),
+        span: spanOf(file, source, entry),
+      });
+    }
+  }
+
   const eventsYaml = root.get('events', true);
   let events: EventsNode | undefined;
   if (isMap(eventsYaml)) {
@@ -986,6 +1029,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(setup           !== undefined && { setup }),
     ...(events          !== undefined && { events }),
     ...(diagnostics     !== undefined && { diagnostics }),
+    ...(merges          !== undefined && { merges }),
     span: spanOf(file, source, root),
   };
 };

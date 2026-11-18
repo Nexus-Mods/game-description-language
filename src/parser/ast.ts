@@ -22,6 +22,7 @@ export interface DocumentNode extends Node {
   setup?: SetupNode;
   events?: EventsNode;
   diagnostics?: DiagnosticNode[];
+  merges?: MergeNode[];
 }
 
 // A runtime diagnostic (in-game health check). `hook` names an exported
@@ -30,6 +31,18 @@ export interface DocumentNode extends Node {
 export interface DiagnosticNode extends Node {
   kind: 'diagnostic';
   hook: string;
+}
+
+// A file merge (Vortex registerMerge). `test` and `merge` name exports in
+// src/hooks.ts: `test` is a MergeTest `(game, discovery) => IMergeFilter |
+// undefined`, `merge` is a MergeFunc `(filePath, mergeDir) => Promise<void>`.
+// `modType` scopes the merge to mods of that type; omitted means Vortex's
+// default mod type ('').
+export interface MergeNode extends Node {
+  kind: 'merge';
+  test: HookRefNode;
+  merge: HookRefNode;
+  modType?: string;
 }
 
 export interface GameNode extends Node {

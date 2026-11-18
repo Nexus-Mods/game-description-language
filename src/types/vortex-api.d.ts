@@ -99,6 +99,14 @@ declare module 'vortex-api' {
     // mods. The concrete IModHealthCheck shape lives in the real vortex-api; GDL
     // passes user-defined check objects straight through.
     registerHealthCheck: (check: IModHealthCheck) => void;
+    // Registers a file merge: for mods of `modType`, files the test's filter
+    // accepts are merged via `merge` instead of overwriting each other. The
+    // real MergeTest returns an IMergeFilter or undefined (doesn't apply).
+    registerMerge: (
+      test: (game: IGame, discovery: unknown) => unknown,
+      merge: (filePath: string, mergeDir: string) => Promise<void>,
+      modType: string,
+    ) => void;
     // Vortex only populates `api.events` etc. after extension init is done; do
     // event-listener wiring inside the `once` callback so it runs at that point.
     once: (callback: () => void | PromiseLike<void>) => void;
