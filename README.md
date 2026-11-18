@@ -2,7 +2,7 @@
 
 A build-time toolchain for writing Vortex game extensions as YAML.
 
-GDL compiles `game.yaml` into a webpack-bundled TypeScript extension that Vortex loads. The YAML covers game registration, mod types, installer routing, discovery, toolbar actions, lifecycle hooks, diagnostics, inline tests, and Nexus release metadata. TypeScript hooks plug in where YAML can't reach.
+GDL compiles `game.yaml` into a webpack-bundled TypeScript extension that Vortex loads. The YAML covers game registration, mod types, installer routing, discovery, toolbar actions, lifecycle hooks, diagnostics, file merges, inline tests, and Nexus release metadata. TypeScript hooks plug in where YAML can't reach.
 
 GDL is the shared toolchain; the games themselves live in the [**`gdl-games`**](https://github.com/Nexus-Mods/gdl-games) monorepo, where each game is a `games/<id>/game.yaml` plus a `gameart.webp`, and one copy of this toolchain (the `gdl/` submodule) builds them all. **If you want to add or maintain a game, start there** — this README documents the toolchain itself.
 
@@ -361,6 +361,32 @@ diagnostics:
   - hook: modShapeRecognisedCheck
 ```
 
+### File merges
+
+The `merges:` block registers Vortex file merges via `context.registerMerge`, so several mods can each ship their own copy of a file and Vortex deploys one merged result instead of letting the last mod win. `test` and `merge` name exports in `src/hooks.ts`. `modType` is optional; leave it out to merge files of Vortex's default mod type, or name a declared modType:
+
+```yaml
+merges:
+  - { test: { hook: isSettingsIni }, merge: { hook: mergeSettingsIni }, modType: root }
+```
+
+```ts
+import type { types } from 'vortex-api';
+
+// MergeTest: which files take part, and the game's original to merge onto.
+export const isSettingsIni = (game: types.IGame, discovery: types.IDiscoveryResult): types.IMergeFilter => ({
+  baseFiles: () => [{ in: `${discovery.path}/settings.ini`, out: 'settings.ini' }],
+  filter: (filePath) => filePath.toLowerCase().endsWith('settings.ini'),
+});
+
+// MergeFunc: fold one mod's copy into the merged output under mergeDir.
+export async function mergeSettingsIni(filePath: string, mergeDir: string): Promise<void> {
+  // ...
+}
+```
+
+The runtime only calls your `test` when Vortex deploys this game; for any other game it returns `undefined` without calling it.
+
 ## Testing
 
 ### Inline cases
@@ -444,7 +470,7 @@ The pipeline:
 3. **Codegen** (`src/codegen/`) emits `.gdl-out/extension.ts`, `installers.gen.ts`, `tests.gen.ts`, `lifecycle.gen.ts`, and `info.json`. Source maps thread back to the original YAML lines.
 4. **Bundler** (`src/bundler/`) runs webpack over the generated TS with `vortex-api` marked external. Output: `dist/extension.js` plus `extension.js.map`.
 
-The runtime in `src/runtime/` is a small shim. It translates the generated calls into Vortex's actual API (`registerGame`, `registerModType`, `registerInstaller`, `registerAction`, `api.events.on`, `registerHealthCheck`).
+The runtime in `src/runtime/` is a small shim. It translates the generated calls into Vortex's actual API (`registerGame`, `registerModType`, `registerInstaller`, `registerAction`, `api.events.on`, `registerHealthCheck`, `registerMerge`).
 
 The CLI subcommands (`build`, `init`, `package`, `publish-info`, `test:corpus`) live under `src/commands/`.
 
@@ -456,7 +482,7 @@ A game in the [`gdl-games`](https://github.com/Nexus-Mods/gdl-games) monorepo is
 games/<id>/
 ├── game.yaml        # all the declarative stuff (incl. top-level version:)
 ├── gameart.webp     # the logo
-└── src/hooks.ts     # optional — version detection / deploy hooks / diagnostics
+└── src/hooks.ts     # optional — version detection / deploy hooks / diagnostics / merges
 ```
 
 There is no per-game `package.json`, `vitest.config.ts`, or workflow. The shared `gdl/` submodule, root config, and one `ci.yml` serve every game; an Nx inference plugin turns each `game.yaml` into a project with cached `build` / `test` / `package` / `test-corpus` targets.

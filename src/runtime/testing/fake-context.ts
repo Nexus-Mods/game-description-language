@@ -76,6 +76,12 @@ export interface RegisteredAction {
   condition?: (instanceIds?: string[]) => boolean | string;
 }
 
+export interface RegisteredMerge {
+  test: (game: { id: string } & Record<string, unknown>, discovery: unknown) => unknown;
+  merge: (filePath: string, mergeDir: string) => Promise<void>;
+  modType: string;
+}
+
 export interface FakeContextHandle {
   /** Pass to the extension's default export — type-cast to IExtensionContext. */
   context: unknown;
@@ -85,6 +91,7 @@ export interface FakeContextHandle {
     installers: RegisteredInstaller[];
     modTypes: RegisteredModType[];
     actions: RegisteredAction[];
+    merges: RegisteredMerge[];
   };
   /** Vortex events the extension subscribed to (via context.once → api.events.on). */
   events: Map<string, ((...args: unknown[]) => void)[]>;
@@ -114,6 +121,7 @@ export const createFakeContext = (opts: FakeContextOpts = {}): FakeContextHandle
     installers: [],
     modTypes: [],
     actions: [],
+    merges: [],
   };
   const events = new Map<string, ((...args: unknown[]) => void)[]>();
   const onceCallbacks: Array<() => void | PromiseLike<void>> = [];
@@ -191,6 +199,13 @@ export const createFakeContext = (opts: FakeContextOpts = {}): FakeContextHandle
         ...(condition !== undefined && { condition }),
       });
     },
+    registerMerge: vi.fn((
+      test: RegisteredMerge['test'],
+      merge: RegisteredMerge['merge'],
+      modType: string,
+    ) => {
+      registered.merges.push({ test, merge, modType });
+    }),
     once: (cb: () => void | PromiseLike<void>) => {
       onceCallbacks.push(cb);
     },
@@ -212,7 +227,6 @@ export const createFakeContext = (opts: FakeContextOpts = {}): FakeContextHandle
     registerArchiveType: vi.fn(),
     registerLoadOrder: vi.fn(),
     registerLoadOrderPage: vi.fn(),
-    registerMerge: vi.fn(),
     registerGameInfoProvider: vi.fn(),
     registerGameStub: vi.fn(),
     registerGameStore: vi.fn(),

@@ -394,6 +394,34 @@ export const validate = (doc: DocumentNode): BuildError[] => {
     }
   }
 
+  if (doc.merges) {
+    const declaredModTypes = new Set((doc.modTypes ?? []).map(m => m.id));
+    const seen = new Set<string>();
+    for (const m of doc.merges) {
+      if (m.modType !== undefined && !declaredModTypes.has(m.modType)) {
+        errors.push({
+          code: 'GDL203',
+          message: `merge \`${m.merge.hookId}\` references undeclared modType \`${m.modType}\``,
+          span: m.span,
+          hint: declaredModTypes.size
+            ? `declared modTypes: ${[...declaredModTypes].join(', ')}; omit modType for Vortex's default mod type`
+            : "no modTypes declared; omit modType for Vortex's default mod type",
+        });
+      }
+      // Registering the same test/merge pair twice for one modType makes
+      // Vortex run the merge twice into the same output file.
+      const key = [m.test.hookId, m.merge.hookId, m.modType ?? ''].join('|');
+      if (seen.has(key)) {
+        errors.push({
+          code: 'GDL204',
+          message: `duplicate merge \`${m.test.hookId}\` / \`${m.merge.hookId}\` for modType \`${m.modType ?? ''}\``,
+          span: m.span,
+        });
+      }
+      seen.add(key);
+    }
+  }
+
   if (doc.nexus) {
     if (!Number.isInteger(doc.nexus.modId) || doc.nexus.modId <= 0) {
       errors.push({
