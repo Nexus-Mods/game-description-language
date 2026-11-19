@@ -82,6 +82,15 @@ export interface RegisteredMerge {
   modType: string;
 }
 
+export interface RegisteredLoadOrder {
+  gameId: string;
+  deserializeLoadOrder: () => Promise<unknown[]>;
+  serializeLoadOrder: (loadOrder: unknown[], prev: unknown[]) => Promise<void>;
+  validate: (prev: unknown[], current: unknown[]) => Promise<unknown>;
+  toggleableEntries?: boolean;
+  usageInstructions?: string;
+}
+
 export interface FakeContextHandle {
   /** Pass to the extension's default export — type-cast to IExtensionContext. */
   context: unknown;
@@ -92,6 +101,7 @@ export interface FakeContextHandle {
     modTypes: RegisteredModType[];
     actions: RegisteredAction[];
     merges: RegisteredMerge[];
+    loadOrders: RegisteredLoadOrder[];
   };
   /** Vortex events the extension subscribed to (via context.once → api.events.on). */
   events: Map<string, ((...args: unknown[]) => void)[]>;
@@ -122,6 +132,7 @@ export const createFakeContext = (opts: FakeContextOpts = {}): FakeContextHandle
     modTypes: [],
     actions: [],
     merges: [],
+    loadOrders: [],
   };
   const events = new Map<string, ((...args: unknown[]) => void)[]>();
   const onceCallbacks: Array<() => void | PromiseLike<void>> = [];
@@ -206,6 +217,9 @@ export const createFakeContext = (opts: FakeContextOpts = {}): FakeContextHandle
     ) => {
       registered.merges.push({ test, merge, modType });
     }),
+    registerLoadOrder: vi.fn((info: RegisteredLoadOrder) => {
+      registered.loadOrders.push(info);
+    }),
     once: (cb: () => void | PromiseLike<void>) => {
       onceCallbacks.push(cb);
     },
@@ -225,7 +239,6 @@ export const createFakeContext = (opts: FakeContextOpts = {}): FakeContextHandle
     registerDashlet: vi.fn(),
     registerStartHook: vi.fn(),
     registerArchiveType: vi.fn(),
-    registerLoadOrder: vi.fn(),
     registerLoadOrderPage: vi.fn(),
     registerGameInfoProvider: vi.fn(),
     registerGameStub: vi.fn(),

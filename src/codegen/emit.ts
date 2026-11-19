@@ -37,7 +37,7 @@ const renderValueNode = (v: ValueNode): string => {
   if (v.kind === 'hookRef') {
     // hookRefs only appear in discovery.version, events.did-deploy and merges today.
     // If a context: binding or modType.path ever uses { hook: ... }, we want this to throw loudly.
-    throw new Error(`hookRef value (${v.hookId}) is not allowed in this position — only discovery.version, events.did-deploy and merges accept hook refs`);
+    throw new Error(`hookRef value (${v.hookId}) is not allowed in this position — only discovery.version, events.did-deploy, merges and loadOrder accept hook refs`);
   }
   // Branch value.
   const arms = Object.entries(v.arms)
@@ -167,14 +167,29 @@ export const emit = (doc: DocumentNode, opts: EmitOptions = {}): EmittedFile[] =
     .map(m => `      { test: hooks.${m.test.hookId}, merge: hooks.${m.merge.hookId}, modType: ${sq(m.modType ?? '')} }`)
     .join(',\n');
 
+  // `undefined` keeps the argument list positional for games without one.
+  const lo = doc.loadOrder;
+  const loadOrderArg = lo
+    ? [
+        '{',
+        `      deserialize: hooks.${lo.deserialize.hookId},`,
+        `      serialize: hooks.${lo.serialize.hookId},`,
+        ...(lo.validate ? [`      validate: hooks.${lo.validate.hookId},`] : []),
+        ...(lo.toggleableEntries !== undefined ? [`      toggleableEntries: ${lo.toggleableEntries},`] : []),
+        ...(lo.usageInstructions !== undefined ? [`      usageInstructions: ${JSON.stringify(lo.usageInstructions)},`] : []),
+        '    }',
+      ].join('\n')
+    : 'undefined';
+
   const hookIds = new Set<string>();
   const versionNode = doc.discovery?.version;
   if (versionNode?.kind === 'hookRef') hookIds.add(versionNode.hookId);
   // The `hooks` namespace import is needed when the version hook, any
-  // diagnostic or any merge references `hooks.<name>`.
+  // diagnostic, any merge or the load order references `hooks.<name>`.
   const needsHooksNamespace = hookIds.size > 0
     || (doc.diagnostics?.length ?? 0) > 0
-    || (doc.merges?.length ?? 0) > 0;
+    || (doc.merges?.length ?? 0) > 0
+    || lo !== undefined;
   const hookImports = needsHooksNamespace
     ? `import * as hooks from '../src/hooks.js';`
     : '';
@@ -290,6 +305,7 @@ ${diagnosticsLines}
     [
 ${mergesLines}
     ],
+    ${loadOrderArg},
   );
   return true;
 }

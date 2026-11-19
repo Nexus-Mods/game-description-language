@@ -1,0 +1,16 @@
+gdl: 1
+game:
+  id: lotest
+  name: Load Order Test
+  executable: LoTest.exe
+  requiredFiles: [LoTest.exe]
+context:
+  dataPath: ${installPath}/data
+modTypes:
+  - { id: data, name: Data, path: "${dataPath}" }
+loadOrder:
+  deserialize: { hook: readLoadOrder }
+  serialize: { hook: writeLoadOrder }
+  validate: { hook: validateLoadOrder }
+  toggleableEntries: true
+  usageInstructions: "Drag paks: later entries load last and win."

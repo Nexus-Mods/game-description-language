@@ -23,6 +23,7 @@ export interface DocumentNode extends Node {
   events?: EventsNode;
   diagnostics?: DiagnosticNode[];
   merges?: MergeNode[];
+  loadOrder?: LoadOrderNode;
 }
 
 // A runtime diagnostic (in-game health check). `hook` names an exported
@@ -43,6 +44,19 @@ export interface MergeNode extends Node {
   test: HookRefNode;
   merge: HookRefNode;
   modType?: string;
+}
+
+// The game's load order page (Vortex registerLoadOrder). `deserialize`,
+// `serialize` and the optional `validate` name exports in src/hooks.ts; each is
+// called with Vortex's own arguments plus a trailing LoadOrderHookCtx (api and
+// the resolved context: vars). `validate` omitted means every order is valid.
+export interface LoadOrderNode extends Node {
+  kind: 'loadOrder';
+  deserialize: HookRefNode;
+  serialize: HookRefNode;
+  validate?: HookRefNode;
+  toggleableEntries?: boolean;
+  usageInstructions?: string;
 }
 
 export interface GameNode extends Node {

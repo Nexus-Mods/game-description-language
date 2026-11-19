@@ -107,6 +107,19 @@ declare module 'vortex-api' {
       merge: (filePath: string, mergeDir: string) => Promise<void>,
       modType: string,
     ) => void;
+    // Registers the game's load order page (Vortex's file-based load order,
+    // "FBLO"). Only the keys GDL emits are declared; the real
+    // ILoadOrderGameInfo is wider. Entries are ILoadOrderEntry objects in the
+    // real vortex-api; GDL passes them through untouched. `validate` resolving
+    // undefined means the order is valid.
+    registerLoadOrder: (info: {
+      gameId: string;
+      deserializeLoadOrder: () => Promise<unknown[]>;
+      serializeLoadOrder: (loadOrder: unknown[], prev: unknown[]) => Promise<void>;
+      validate: (prev: unknown[], current: unknown[]) => Promise<unknown>;
+      toggleableEntries?: boolean;
+      usageInstructions?: string;
+    }) => void;
     // Vortex only populates `api.events` etc. after extension init is done; do
     // event-listener wiring inside the `once` callback so it runs at that point.
     once: (callback: () => void | PromiseLike<void>) => void;

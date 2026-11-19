@@ -7,6 +7,7 @@ import type {
   TestsNode, TestCaseNode, ExpectNode, CorpusMode,
   ValidatorNode, ValidatorAssertNode, PlacementAssertNode,
   NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode, DiagnosticNode, MergeNode,
+  LoadOrderNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -997,6 +998,77 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }
   }
 
+  const loadOrderYaml = root.get('loadOrder', true);
+  let loadOrder: LoadOrderNode | undefined;
+  if (loadOrderYaml !== undefined && loadOrderYaml !== null) {
+    if (!isMap(loadOrderYaml)) {
+      throw new BuildErrors([{
+        code: 'GDL210',
+        message: 'loadOrder must be a mapping with `deserialize:` and `serialize:` hook references',
+        span: spanOf(file, source, loadOrderYaml as YamlNode),
+      }]);
+    }
+    const known = new Set(['deserialize', 'serialize', 'validate', 'toggleableEntries', 'usageInstructions']);
+    for (const pair of loadOrderYaml.items) {
+      const key = isScalar(pair.key) ? String(pair.key.value) : '';
+      if (!known.has(key)) {
+        throw new BuildErrors([{
+          code: 'GDL214',
+          message: `unknown loadOrder key \`${key}\``,
+          span: spanOf(file, source, pair.key as YamlNode),
+          hint: `known keys: ${[...known].join(', ')}`,
+        }]);
+      }
+    }
+    const hookAt = (key: string): HookRefNode | undefined => {
+      const node = loadOrderYaml.get(key, true);
+      return node === undefined || node === null ? undefined : parseHookRef(node as YamlNode, file, source);
+    };
+    const deserialize = hookAt('deserialize');
+    const serialize = hookAt('serialize');
+    if (deserialize === undefined || serialize === undefined) {
+      throw new BuildErrors([{
+        code: 'GDL211',
+        message: 'loadOrder needs both `deserialize: { hook: <id> }` and `serialize: { hook: <id> }`',
+        span: spanOf(file, source, loadOrderYaml),
+      }]);
+    }
+    const validateHook = hookAt('validate');
+    const toggleYaml = loadOrderYaml.get('toggleableEntries', true);
+    let toggleableEntries: boolean | undefined;
+    if (toggleYaml !== undefined && toggleYaml !== null) {
+      if (!isScalar(toggleYaml) || typeof toggleYaml.value !== 'boolean') {
+        throw new BuildErrors([{
+          code: 'GDL212',
+          message: 'loadOrder `toggleableEntries:` must be true or false',
+          span: spanOf(file, source, toggleYaml as YamlNode),
+        }]);
+      }
+      toggleableEntries = toggleYaml.value;
+    }
+    const usageYaml = loadOrderYaml.get('usageInstructions', true);
+    let usageInstructions: string | undefined;
+    if (usageYaml !== undefined && usageYaml !== null) {
+      if (!isScalar(usageYaml) || typeof usageYaml.value !== 'string') {
+        throw new BuildErrors([{
+          code: 'GDL213',
+          message: 'loadOrder `usageInstructions:` must be a string',
+          span: spanOf(file, source, usageYaml as YamlNode),
+        }]);
+      }
+      usageInstructions = usageYaml.value;
+    }
+    loadOrder = {
+      kind: 'loadOrder',
+      deserialize,
+      serialize,
+      ...(validateHook !== undefined && { validate: validateHook }),
+      ...(toggleableEntries !== undefined && { toggleableEntries }),
+      ...(usageInstructions !== undefined && { usageInstructions }),
+      span: spanOf(file, source, loadOrderYaml),
+    };
+  }
+
   const eventsYaml = root.get('events', true);
   let events: EventsNode | undefined;
   if (isMap(eventsYaml)) {
@@ -1030,6 +1102,7 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(events          !== undefined && { events }),
     ...(diagnostics     !== undefined && { diagnostics }),
     ...(merges          !== undefined && { merges }),
+    ...(loadOrder       !== undefined && { loadOrder }),
     span: spanOf(file, source, root),
   };
 };

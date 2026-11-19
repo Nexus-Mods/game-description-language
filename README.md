@@ -2,7 +2,7 @@
 
 A build-time toolchain for writing Vortex game extensions as YAML.
 
-GDL compiles `game.yaml` into a webpack-bundled TypeScript extension that Vortex loads. The YAML covers game registration, mod types, installer routing, discovery, toolbar actions, lifecycle hooks, diagnostics, file merges, inline tests, and Nexus release metadata. TypeScript hooks plug in where YAML can't reach.
+GDL compiles `game.yaml` into a webpack-bundled TypeScript extension that Vortex loads. The YAML covers game registration, mod types, installer routing, discovery, toolbar actions, lifecycle hooks, diagnostics, file merges, load order, inline tests, and Nexus release metadata. TypeScript hooks plug in where YAML can't reach.
 
 GDL is the shared toolchain; the games themselves live in the [**`gdl-games`**](https://github.com/Nexus-Mods/gdl-games) monorepo, where each game is a `games/<id>/game.yaml` plus a `gameart.webp`, and one copy of this toolchain (the `gdl/` submodule) builds them all. **If you want to add or maintain a game, start there** — this README documents the toolchain itself.
 
@@ -387,6 +387,43 @@ export async function mergeSettingsIni(filePath: string, mergeDir: string): Prom
 
 The runtime only calls your `test` when Vortex deploys this game; for any other game it returns `undefined` without calling it.
 
+### Load order
+
+The `loadOrder:` block registers the game's load order page via `context.registerLoadOrder` (Vortex's file-based load order), for games where the order mods load in decides which one wins. `deserialize` and `serialize` are required, `validate` is optional; all three name exports in `src/hooks.ts`:
+
+```yaml
+loadOrder:
+  deserialize: { hook: readLoadOrder }
+  serialize: { hook: writeLoadOrder }
+  validate: { hook: validateLoadOrder }   # optional; omitted = every order is valid
+  toggleableEntries: true                  # optional; entries get an enable checkbox
+  usageInstructions: "Drag paks to reorder; later entries win."   # optional; shown on the page
+```
+
+Each hook gets Vortex's own arguments plus a trailing `ctx`: `api` (Vortex's extension API, for state such as the profile's mods), `gameId`, and `vars`, the resolved context (`installPath` from Vortex's live discovery plus every `context:` binding), so a hook can find the mod folder without re-deriving paths:
+
+```ts
+import type { types } from 'vortex-api';
+import type { LoadOrderHookCtx } from '@gdl/runtime';
+
+// Build the list Vortex shows, in the current order.
+export async function readLoadOrder(ctx: LoadOrderHookCtx): Promise<types.LoadOrder> {
+  // ...
+}
+
+// Apply the order the user set (write a file, rename paks, ...).
+export async function writeLoadOrder(loadOrder: types.LoadOrder, prev: types.LoadOrder, ctx: LoadOrderHookCtx): Promise<void> {
+  // ...
+}
+
+// Resolve undefined when valid, or { invalid: [{ id, reason }] }.
+export async function validateLoadOrder(prev: types.LoadOrder, current: types.LoadOrder, ctx: LoadOrderHookCtx): Promise<types.IValidationResult | undefined> {
+  return undefined;
+}
+```
+
+Vortex keys the load order by game id, so no game gate is needed. The generated `lifecycle.gen.ts` checks the registration and that each Vortex callback reaches your hook.
+
 ## Testing
 
 ### Inline cases
@@ -470,7 +507,7 @@ The pipeline:
 3. **Codegen** (`src/codegen/`) emits `.gdl-out/extension.ts`, `installers.gen.ts`, `tests.gen.ts`, `lifecycle.gen.ts`, and `info.json`. Source maps thread back to the original YAML lines.
 4. **Bundler** (`src/bundler/`) runs webpack over the generated TS with `vortex-api` marked external. Output: `dist/extension.js` plus `extension.js.map`.
 
-The runtime in `src/runtime/` is a small shim. It translates the generated calls into Vortex's actual API (`registerGame`, `registerModType`, `registerInstaller`, `registerAction`, `api.events.on`, `registerHealthCheck`, `registerMerge`).
+The runtime in `src/runtime/` is a small shim. It translates the generated calls into Vortex's actual API (`registerGame`, `registerModType`, `registerInstaller`, `registerAction`, `api.events.on`, `registerHealthCheck`, `registerMerge`, `registerLoadOrder`).
 
 The CLI subcommands (`build`, `init`, `package`, `publish-info`, `test:corpus`) live under `src/commands/`.
 
@@ -482,7 +519,7 @@ A game in the [`gdl-games`](https://github.com/Nexus-Mods/gdl-games) monorepo is
 games/<id>/
 ├── game.yaml        # all the declarative stuff (incl. top-level version:)
 ├── gameart.webp     # the logo
-└── src/hooks.ts     # optional — version detection / deploy hooks / diagnostics / merges
+└── src/hooks.ts     # optional — version detection / deploy hooks / diagnostics / merges / load order
 ```
 
 There is no per-game `package.json`, `vitest.config.ts`, or workflow. The shared `gdl/` submodule, root config, and one `ci.yml` serve every game; an Nx inference plugin turns each `game.yaml` into a project with cached `build` / `test` / `package` / `test-corpus` targets.
