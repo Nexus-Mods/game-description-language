@@ -1,0 +1,10 @@
+gdl: 1
+game:
+  id: mergetest
+  name: Merge Test
+  executable: MergeTest.exe
+  requiredFiles: [MergeTest.exe]
+modTypes:
+  - { id: root, name: Root, path: "${installPath}" }
+merges:
+  - { test: { hook: isTablesSds }, merge: { hook: mergeTablesSds }, modType: root }

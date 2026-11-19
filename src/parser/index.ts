@@ -6,7 +6,8 @@ import type {
   FileVersionNode, VersionSourceNode,
   TestsNode, TestCaseNode, ExpectNode, CorpusMode,
   ValidatorNode, ValidatorAssertNode, PlacementAssertNode,
-  NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode, DiagnosticNode,
+  NexusNode, ToolbarActionNode, ToolbarActionTarget, SetupNode, EventsNode, DiagnosticNode, MergeNode,
+  LoadOrderNode,
 } from './ast.js';
 import type { YamlSpan } from '../errors.js';
 import { BuildErrors, type BuildError } from '../errors.js';
@@ -954,6 +955,120 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     }
   }
 
+  const mergesYaml = root.get('merges', true);
+  let merges: MergeNode[] | undefined;
+  if (isSeq(mergesYaml)) {
+    merges = [];
+    for (const entry of mergesYaml.items) {
+      if (!isMap(entry)) {
+        throw new BuildErrors([{
+          code: 'GDL200',
+          message: 'merges entries must be mappings with `test:` and `merge:` hook references',
+          span: spanOf(file, source, entry as YamlNode),
+        }]);
+      }
+      const testYaml = entry.get('test', true);
+      const mergeYaml = entry.get('merge', true);
+      if (testYaml === undefined || testYaml === null || mergeYaml === undefined || mergeYaml === null) {
+        throw new BuildErrors([{
+          code: 'GDL201',
+          message: 'merges entry needs both `test: { hook: <id> }` and `merge: { hook: <id> }`',
+          span: spanOf(file, source, entry),
+        }]);
+      }
+      const modTypeYaml = entry.get('modType', true);
+      let modType: string | undefined;
+      if (modTypeYaml !== undefined && modTypeYaml !== null) {
+        if (!isScalar(modTypeYaml) || typeof modTypeYaml.value !== 'string') {
+          throw new BuildErrors([{
+            code: 'GDL202',
+            message: 'merges entry `modType:` must be a string naming a declared modType',
+            span: spanOf(file, source, modTypeYaml as YamlNode),
+          }]);
+        }
+        modType = modTypeYaml.value;
+      }
+      merges.push({
+        kind: 'merge',
+        test: parseHookRef(testYaml as YamlNode, file, source),
+        merge: parseHookRef(mergeYaml as YamlNode, file, source),
+        ...(modType !== undefined && { modType }),
+        span: spanOf(file, source, entry),
+      });
+    }
+  }
+
+  const loadOrderYaml = root.get('loadOrder', true);
+  let loadOrder: LoadOrderNode | undefined;
+  if (loadOrderYaml !== undefined && loadOrderYaml !== null) {
+    if (!isMap(loadOrderYaml)) {
+      throw new BuildErrors([{
+        code: 'GDL210',
+        message: 'loadOrder must be a mapping with `deserialize:` and `serialize:` hook references',
+        span: spanOf(file, source, loadOrderYaml as YamlNode),
+      }]);
+    }
+    const known = new Set(['deserialize', 'serialize', 'validate', 'toggleableEntries', 'usageInstructions']);
+    for (const pair of loadOrderYaml.items) {
+      const key = isScalar(pair.key) ? String(pair.key.value) : '';
+      if (!known.has(key)) {
+        throw new BuildErrors([{
+          code: 'GDL214',
+          message: `unknown loadOrder key \`${key}\``,
+          span: spanOf(file, source, pair.key as YamlNode),
+          hint: `known keys: ${[...known].join(', ')}`,
+        }]);
+      }
+    }
+    const hookAt = (key: string): HookRefNode | undefined => {
+      const node = loadOrderYaml.get(key, true);
+      return node === undefined || node === null ? undefined : parseHookRef(node as YamlNode, file, source);
+    };
+    const deserialize = hookAt('deserialize');
+    const serialize = hookAt('serialize');
+    if (deserialize === undefined || serialize === undefined) {
+      throw new BuildErrors([{
+        code: 'GDL211',
+        message: 'loadOrder needs both `deserialize: { hook: <id> }` and `serialize: { hook: <id> }`',
+        span: spanOf(file, source, loadOrderYaml),
+      }]);
+    }
+    const validateHook = hookAt('validate');
+    const toggleYaml = loadOrderYaml.get('toggleableEntries', true);
+    let toggleableEntries: boolean | undefined;
+    if (toggleYaml !== undefined && toggleYaml !== null) {
+      if (!isScalar(toggleYaml) || typeof toggleYaml.value !== 'boolean') {
+        throw new BuildErrors([{
+          code: 'GDL212',
+          message: 'loadOrder `toggleableEntries:` must be true or false',
+          span: spanOf(file, source, toggleYaml as YamlNode),
+        }]);
+      }
+      toggleableEntries = toggleYaml.value;
+    }
+    const usageYaml = loadOrderYaml.get('usageInstructions', true);
+    let usageInstructions: string | undefined;
+    if (usageYaml !== undefined && usageYaml !== null) {
+      if (!isScalar(usageYaml) || typeof usageYaml.value !== 'string') {
+        throw new BuildErrors([{
+          code: 'GDL213',
+          message: 'loadOrder `usageInstructions:` must be a string',
+          span: spanOf(file, source, usageYaml as YamlNode),
+        }]);
+      }
+      usageInstructions = usageYaml.value;
+    }
+    loadOrder = {
+      kind: 'loadOrder',
+      deserialize,
+      serialize,
+      ...(validateHook !== undefined && { validate: validateHook }),
+      ...(toggleableEntries !== undefined && { toggleableEntries }),
+      ...(usageInstructions !== undefined && { usageInstructions }),
+      span: spanOf(file, source, loadOrderYaml),
+    };
+  }
+
   const eventsYaml = root.get('events', true);
   let events: EventsNode | undefined;
   if (isMap(eventsYaml)) {
@@ -986,6 +1101,8 @@ export const parseYaml = (source: string, file: string): DocumentNode => {
     ...(setup           !== undefined && { setup }),
     ...(events          !== undefined && { events }),
     ...(diagnostics     !== undefined && { diagnostics }),
+    ...(merges          !== undefined && { merges }),
+    ...(loadOrder       !== undefined && { loadOrder }),
     span: spanOf(file, source, root),
   };
 };

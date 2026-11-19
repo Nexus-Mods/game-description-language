@@ -97,6 +97,40 @@ export interface EventHooks {
   didDeploy?: DidDeployHook;
 }
 
+// A file merge from the `merges:` block. `test` and `merge` are the user's
+// MergeTest / MergeFunc exports from src/hooks.ts, typed loosely here because
+// their concrete parameter types (IGame, IDiscoveryResult, IMergeFilter) live
+// in the real vortex-api. Method syntax keeps the parameters bivariant, so a
+// hook typed against the real IDiscoveryResult still fits.
+export interface MergeDecl {
+  test(game: IGame, discovery: unknown): unknown;
+  merge(filePath: string, mergeDir: string): Promise<void>;
+  modType: string;
+}
+
+// What every load order hook gets as its last argument: Vortex's API (for
+// state, e.g. the profile's enabled mods) and the game's resolved context
+// (installPath plus every `context:` binding), so a hook can find the mod
+// folder without re-deriving paths.
+export interface LoadOrderHookCtx {
+  api: unknown;
+  gameId: string;
+  vars: ResolvedContext;
+}
+
+// The `loadOrder:` block. The hooks are the user's exports from src/hooks.ts,
+// called with Vortex's own arguments plus a trailing LoadOrderHookCtx. Entries
+// are typed loosely (unknown[]) because ILoadOrderEntry lives in the real
+// vortex-api; method syntax keeps parameters bivariant so hooks typed against
+// it still fit.
+export interface LoadOrderDecl {
+  deserialize(ctx: LoadOrderHookCtx): Promise<unknown[]>;
+  serialize(loadOrder: unknown[], prev: unknown[], ctx: LoadOrderHookCtx): Promise<void>;
+  validate?(prev: unknown[], current: unknown[], ctx: LoadOrderHookCtx): Promise<unknown>;
+  toggleableEntries?: boolean;
+  usageInstructions?: string;
+}
+
 export class GdlRuntime {
   private resolvedCtx?: ResolvedContext;
   private cachedFacts?: DiscoveryFacts;
@@ -286,6 +320,8 @@ export class GdlRuntime {
     setupDirs: string[] = [],
     eventHooks: EventHooks = {},
     diagnostics: IModHealthCheck[] = [],
+    merges: MergeDecl[] = [],
+    loadOrder?: LoadOrderDecl,
   ) {
     // Captured for ensureResolvedCtx(), which lazily rebuilds the context from
     // live discovery when setup()/queryPath() haven't populated it.
@@ -397,14 +433,7 @@ export class GdlRuntime {
         mt.id,
         50,
         (gameId) => gameId === decl.id,
-        () => {
-          const discovery = this.liveDiscovery(decl.id);
-          const ctx = {
-            ...this.ensureResolvedCtx(),
-            ...(discovery?.path !== undefined && { installPath: discovery.path }),
-          };
-          return this.resolveModTypePath(mt, ctx as ResolvedContext);
-        },
+        () => this.resolveModTypePath(mt, this.liveCtx(decl.id)),
         async () => true,
         // Spread rather than always passing the key: Vortex reads it as
         // `deploymentEssential === false`, and its own default is true, so an
@@ -445,6 +474,49 @@ export class GdlRuntime {
     for (const check of diagnostics) {
       this.api.registerHealthCheck(check);
     }
+
+    // Vortex runs every registered merge test for whatever game is being
+    // deployed, so gate the user's test on our game id: returning undefined
+    // tells Vortex the merge doesn't apply.
+    for (const m of merges) {
+      this.api.registerMerge(
+        (game, discovery) => (game.id === decl.id ? m.test(game, discovery) : undefined),
+        m.merge,
+        m.modType,
+      );
+    }
+
+    if (loadOrder) this.registerLoadOrder(decl.id, loadOrder);
+  }
+
+  // The resolved context with installPath taken from Vortex's live discovery,
+  // which is authoritative (manual installs, a path the user changed).
+  private liveCtx(gameId: string): ResolvedContext {
+    const discovery = this.liveDiscovery(gameId);
+    return {
+      ...this.ensureResolvedCtx(),
+      ...(discovery?.path !== undefined && { installPath: discovery.path }),
+    } as ResolvedContext;
+  }
+
+  // Vortex keys a load order by gameId, so unlike merges no game gate is
+  // needed. The context is resolved per call: the page can open (and Vortex
+  // can deserialize) before setup() has run in this session.
+  private registerLoadOrder(gameId: string, lo: LoadOrderDecl): void {
+    const hookCtx = (): LoadOrderHookCtx => ({
+      api: this.api.api,
+      gameId,
+      vars: this.liveCtx(gameId),
+    });
+    this.api.registerLoadOrder({
+      gameId,
+      deserializeLoadOrder: () => lo.deserialize(hookCtx()),
+      serializeLoadOrder: (loadOrder, prev) => lo.serialize(loadOrder, prev, hookCtx()),
+      validate: async (prev, current) =>
+        (lo.validate ? lo.validate(prev, current, hookCtx()) : undefined),
+      ...(lo.toggleableEntries !== undefined && { toggleableEntries: lo.toggleableEntries }),
+      ...(lo.usageInstructions !== undefined && { usageInstructions: lo.usageInstructions }),
+    });
   }
 
   private registerInstallerRule(gameId: string, rule: InstallerRule): void {
